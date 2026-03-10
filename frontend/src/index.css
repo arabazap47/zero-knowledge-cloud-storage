@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+html{
+scroll-behavior:smooth;
+}
+
+body{
+  background:#f8fafc;
+  font-family: Inter, sans-serif;
+}
+
+.container{
+  max-width:1600px;
+  margin-left:auto;
+  margin-right: auto;
+  padding:0 20px;
+}
+section{
+scroll-margin-top:120px;
+}

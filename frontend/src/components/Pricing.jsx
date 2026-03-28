@@ -1,99 +1,57 @@
+import { Check } from "lucide-react";
+
 export default function Pricing() {
+  const plans = [
+    { name: "Starter", price: "Free", storage: "10GB Limit", button: "Select Plan", color: "gray" },
+    { name: "Pro", price: "$8.99", storage: "500GB Limit", button: "Select Plan", color: "blue" },
+    { name: "Business", price: "$17.99", storage: "2TB+ Limit", button: "Select Plan", color: "gray" }
+  ];
 
-const plans = [
-{
-name: "Free",
-price: "$0",
-features: [
-"3 Forms",
-"100 Responses / month",
-"Basic Analytics",
-"Share via link",
-],
-highlight:false
-},
+  return (
+    <section className="bg-[#050505] text-white py-24 px-8">
+      <h2 className="text-3xl font-bold text-center mb-16">Pricing</h2>
 
-{
-name: "Pro",
-price: "$19",
-features: [
-"Unlimited Forms",
-"10,000 Responses",
-"Advanced Analytics",
-"AI Insights",
-"Multi-channel distribution",
-],
-highlight:true
-},
+      <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-6">
+        {plans.map((plan, i) => (
+          <div
+            key={i}
+            className={`p-8 rounded-3xl border ${
+              plan.color === "blue"
+                ? "border-blue-500/50 bg-blue-500/5"
+                : "border-gray-800 bg-gray-900/20"
+            } text-center`}
+          >
+            <p className="text-gray-400 font-medium mb-2">{plan.name}</p>
 
-{
-name: "Enterprise",
-price: "Custom",
-features: [
-"Unlimited everything",
-"AI response analysis",
-"Team collaboration",
-"Custom integrations",
-"Priority support"
-],
-highlight:false
-}
-]
+            <h3 className="text-4xl font-bold mb-8">{plan.price}</h3>
 
-return(
+            <ul className="text-left space-y-4 mb-10 text-sm text-gray-400">
+              <li className="flex items-center gap-2">
+                <Check size={14} className="text-blue-500" />
+                Key Features
+              </li>
+              <li className="flex items-center gap-2">
+                <Check size={14} className="text-blue-500" />
+                No access to Storage
+              </li>
+              <li className="flex items-center gap-2">
+                <Check size={14} className="text-blue-500" />
+                {plan.storage}
+              </li>
+            </ul>
 
-<section id="pricing" className="container py-24 mt-24 scroll-mt-32">
-
-<h2 className="text-3xl font-bold text-center mb-16">
-Pricing
-</h2>
-
-<div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-
-{plans.map((plan,i)=>(
-
-<div
-key={i}
-className={`p-8 rounded-lg border transition hover:shadow-lg 
-${plan.highlight 
-? "bg-gradient-to-br from-purple-500 to-blue-500 text-white scale-105" 
-: "bg-white"}
-`}
->
-
-<h3 className="text-xl font-semibold">
-{plan.name}
-</h3>
-
-<p className="text-4xl font-bold mt-3">
-{plan.price}
-</p>
-
-<ul className="mt-6 space-y-2 text-sm">
-
-{plan.features.map((f,index)=>(
-<li key={index}>• {f}</li>
-))}
-
-</ul>
-
-<button
-className={`mt-6 w-full py-2 rounded-md font-medium
-${plan.highlight
-? "bg-white text-purple-600"
-: "bg-purple-600 text-white"}
-`}
->
-Get Started
-</button>
-
-</div>
-
-))}
-
-</div>
-
-</section>
-
-)
+            <button
+              className={`w-full py-3 rounded-xl font-semibold transition ${
+                plan.color === "blue"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-gray-800 hover:bg-gray-700"
+              }`}
+            >
+              {plan.button}
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }

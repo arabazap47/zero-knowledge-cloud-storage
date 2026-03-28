@@ -1,75 +1,38 @@
-import { motion } from "framer-motion";
+import { Lock } from "lucide-react";
 
 export default function Hero() {
+  return (
+    <section className="relative px-8 pt-20 pb-32 bg-[#050505] text-white overflow-hidden">
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center">
+        <div className="md:w-1/2 z-10">
+          <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">
+            Your Files. Your Keys.<br />Your Privacy.
+          </h1>
+          <p className="text-gray-400 text-lg mb-8 max-w-md">
+            Experience privacy-first cloud storage. We cannot access your data;
+            only you hold the keys.
+          </p>
+          <div className="flex gap-4">
+            <button className="bg-blue-600 px-8 py-3 rounded-lg font-semibold">
+              Start Secure Storage
+            </button>
+            <button className="border border-gray-700 px-8 py-3 rounded-lg font-semibold">
+              View Demo
+            </button>
+          </div>
+        </div>
 
-return(
-
-<motion.section
-id="home"
-initial={{ opacity:0 }}
-animate={{ opacity:1 }}
-transition={{ duration:0.6 }}
-className="relative pt-24 mb-54 text-center"
->
-
-{/* Gradient background */}
-<div
-className="absolute inset-0 -z-10"
-style={{
-background: `
-radial-gradient(circle at 30% 20%, rgba(168,85,247,0.25), transparent 40%),
-radial-gradient(circle at 80% 30%, rgba(59,130,246,0.25), transparent 40%),
-linear-gradient(to bottom, #ffffff, #f5f3ff 40%, #eff6ff)
-`
-}}
-></div>
-
-{/* Glow blobs */}
-{/* <div className="absolute top-[-120px] left-[-120px] w-[420px] h-[420px] bg-purple-300 rounded-full blur-[120px] opacity-30"></div>
-
-<div className="absolute bottom-[-120px] right-[-120px] w-[420px] h-[420px] bg-blue-300 rounded-full blur-[120px] opacity-30"></div> */}
-
-
-{/* Hero content container */}
-<div className="max-w-5xl mx-auto px-6">
-
-<motion.h1
-initial={{ opacity: 0, y: 50 }}
-animate={{ opacity: 1, y: 0 }}
-transition={{ duration: 0.8 }}
-className="text-4xl md:text-6xl font-bold leading-tight"
->
-Create Smart Forms in
-<br/>
-Seconds with AI
-</motion.h1>
-
-<p className="text-gray-500 mt-6 text-lg max-w-xl mx-auto">
-The intelligent way to build, deploy, and analyze forms without coding.
-</p>
-
-<motion.button
-initial={{ opacity: 0, scale: 0.8 }}
-animate={{ opacity: 1, scale: 1 }}
-transition={{ delay: 0.5 }}
-className="mt-8 px-8 py-3 text-white rounded-full bg-gradient-to-r from-purple-500 to-blue-500 shadow-lg hover:scale-105 transition"
->
-Get Started - It's Free
-</motion.button>
-
-</div>
-
-{/* Preview image */}
-<div className="flex justify-center mt-20 px-6 relative z-10">
-
-<img
-src="https://www.bigfootdigital.co.uk/wp-content/uploads/2020/07/image-optimisation-scaled.jpg"
-className="rounded-xl shadow-[0_30px_60px_rgba(0,0,0,0.15)] w-full max-w-[900px] -mb-32"
-/>
-
-</div>
-
-</motion.section>
-
-)
+        <div className="md:w-1/2 mt-16 md:mt-0 flex justify-center relative">
+          <div className="relative w-80 h-80">
+            <div className="absolute inset-0 bg-blue-500/20 blur-[100px] rounded-full"></div>
+            <div className="relative border border-blue-500/30 rounded-3xl p-8 backdrop-blur-sm bg-blue-900/10">
+              <div className="flex flex-col items-center justify-center h-full border-2 border-dashed border-blue-400/20 rounded-2xl">
+                <Lock size={64} className="text-blue-400 mb-4 animate-pulse" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }

@@ -1,20 +1,30 @@
 @import "tailwindcss";
 
-html{
-scroll-behavior:smooth;
+/* 1. Global Reset */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #050505; /* Deep black background */
+  color: white;
+  font-family: 'Inter', sans-serif;
+  scroll-behavior: smooth;
+  overflow-x: hidden; /* Prevents accidental horizontal scrolling */
 }
 
-body{
-  background:#f8fafc;
-  font-family: Inter, sans-serif;
+/* 2. Full-Width Section Utility */
+section {
+  width: 100%;
+  scroll-margin-top: 80px;
 }
 
-.container{
-  max-width:1600px;
-  margin-left:auto;
-  margin-right: auto;
-  padding:0 20px;
+/* 3. Content Constraint (Internal only) */
+.container {
+  max-width: 1200px; /* Standard width for content */
+  margin: 0 auto;
+  padding: 0 2rem;
 }
-section{
-scroll-margin-top:120px;
-}
+.blue-glow {
+  box-shadow: 0 0 50px -12px rgba(37, 99, 235, 0.5);
+} 

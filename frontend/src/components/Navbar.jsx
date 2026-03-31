@@ -2,8 +2,12 @@ import React, { useState } from 'react';
 import { Shield, AlignRight, X } from "lucide-react";
 import { Link } from "react-router-dom"; // ✅ ONLY ADDITION
 
-export default function Navbar() {
+export default function Navbar({ onLoginClick }) {
   const [isOpen, setIsOpen] = useState(false);
+  const handleMobileLogin = () => {
+    setIsOpen(false);
+    onLoginClick();
+  };
 
   return (
     <nav className="fixed to-0 z-50 w-full flex items-center justify-between px-8 py-6 bg-[#050505] text-white border-b border-white/5">
@@ -26,13 +30,12 @@ export default function Navbar() {
       {/* Desktop Buttons & Mobile Toggle */} 
       <div className="flex items-center gap-4">
 
-        {/* ✅ FIXED LOGIN */}
-        <Link
-          to="/login"
+        <button
+          onClick={onLoginClick}
           className="hidden md:block text-sm font-medium text-gray-300 hover:text-white transition"
         >
           Log In
-        </Link>
+        </button>
 
         <button className="hidden md:block bg-blue-600 hover:bg-blue-700 px-6 py-2.5 rounded-full text-sm font-semibold transition-all active:scale-95">
           Get Started
@@ -59,13 +62,12 @@ export default function Navbar() {
           <hr className="border-white/5" />
 
           
-          <Link
-            to="/login"
-            onClick={() => setIsOpen(false)}
-            className="text-left text-lg text-gray-300"
+          <button
+            onClick={handleMobileLogin}
+            className="text-left text-lg text-gray-300 hover:text-blue-500 transition-colors"
           >
             Log In
-          </Link>
+          </button>
 
           <button className="bg-blue-600 py-4 rounded-xl font-bold">
             Get Started

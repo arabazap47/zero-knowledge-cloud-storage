@@ -114,3 +114,62 @@ export const login = async (req, res) => {
     res.status(500).json(err);
   }
 };
+
+// --- FORGOT PASSWORD (SEND EMAIL) ---
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  console.log("Inside forgotPassword controller...");
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    // Create a 15-minute token
+    const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
+    const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: { 
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS 
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
+
+    await transporter.sendMail({
+      from: '"CypherVault Security" <security@cyphervault.com>',
+      to: email,
+      subject: "Reset Your Vault Access",
+      html: `
+        <div style="background:#050505; color:white; padding:30px; border-radius:15px; font-family:sans-serif; border:1px solid #333;">
+          <h2 style="color:#2563eb;">Key Reset Requested</h2>
+          <p>Click the button below to set a new Private Key. This link expires in 15 minutes.</p>
+          <a href="${resetLink}" style="display:inline-block; background:#fff; color:#000; padding:12px 25px; border-radius:8px; text-decoration:none; font-weight:bold; margin:20px 0;">Reset Private Key</a>
+          <p style="color:#555; font-size:12px;">If you didn't request this, please secure your account.</p>
+        </div>`
+    });
+
+    res.json({ msg: "Reset link sent" });
+  } catch (err) {
+    console.error("CRITICAL ERROR:", err); // This MUST show up if it fails
+    res.status(500).json({ msg: "Error sending email" });
+  }
+};
+
+// --- RESET PASSWORD (UPDATE DB) ---
+export const resetPassword = async (req, res) => {
+  const { token, newPassword } = req.body;
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    await User.findByIdAndUpdate(decoded.id, { password: hashedPassword });
+    res.json({ msg: "Password updated successfully" });
+  } catch (err) {
+    res.status(400).json({ msg: "Invalid or expired token" });
+  }
+};

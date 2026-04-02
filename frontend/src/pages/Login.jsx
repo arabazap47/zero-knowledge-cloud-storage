@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
-  Lock,
+  Shield,
   ShieldCheck,
   Key,
   Mail,
@@ -175,7 +175,7 @@ const Login = ({ isOpen, onClose, onSwitchToSignup }) => {
               <div className="hidden lg:flex flex-col justify-between p-8 bg-blue-600/5 border-r border-white/5">
                 <div className="flex items-center gap-2">
                   <div className="bg-blue-600 p-1.5 rounded-lg">
-                    <Lock size={20} className="text-white" />
+                    <Shield size={20} className="text-white" />
                   </div>
                   <span className="font-bold italic tracking-tight">
                     CypherVault

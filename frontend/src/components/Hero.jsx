@@ -1,6 +1,6 @@
 import { Lock } from "lucide-react";
 
-export default function Hero() {
+export default function Hero( { onSignupClick }) {
   return (
     <section className="relative px-8 pt-20 pb-32 bg-[#050505] text-white overflow-hidden">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center">
@@ -13,7 +13,9 @@ export default function Hero() {
             only you hold the keys.
           </p>
           <div className="flex gap-4">
-            <button className="bg-blue-600 px-8 py-3 rounded-lg font-semibold">
+            <button 
+              onClick={onSignupClick}
+            className="bg-blue-600 px-8 py-3 rounded-lg font-semibold">
               Start Secure Storage
             </button>
             <button className="border border-gray-700 px-8 py-3 rounded-lg font-semibold">

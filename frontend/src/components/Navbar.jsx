@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Shield, AlignRight, X } from "lucide-react";
 import { Link } from "react-router-dom"; // ✅ ONLY ADDITION
 
-export default function Navbar({ onLoginClick }) {
+export default function Navbar({ onLoginClick, onSignupClick }) {
   const [isOpen, setIsOpen] = useState(false);
   const handleMobileLogin = () => {
     setIsOpen(false);
@@ -37,7 +37,9 @@ export default function Navbar({ onLoginClick }) {
           Log In
         </button>
 
-        <button className="hidden md:block bg-blue-600 hover:bg-blue-700 px-6 py-2.5 rounded-full text-sm font-semibold transition-all active:scale-95">
+        <button 
+          onClick={onSignupClick}
+        className="hidden md:block bg-blue-600 hover:bg-blue-700 px-6 py-2.5 rounded-full text-sm font-semibold transition-all active:scale-95">
           Get Started
         </button>
 

@@ -60,7 +60,7 @@ export default function App() {
       {/* Pass setIsLoginOpen to Navbar so the login button can trigger it */}
       <Navbar onLoginClick={openLogin} onSignupClick={openSignup} />
       <div id="hero">
-      <Hero />
+      <Hero onSignupClick={openSignup} />
       </div>
       <div id="features">
         <Features />

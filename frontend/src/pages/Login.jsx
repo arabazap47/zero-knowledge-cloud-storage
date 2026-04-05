@@ -11,12 +11,14 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import VaultLoader from "../components/VaultLoader";
 
 const features = [
   {
     title: "Military-Grade",
     desc: "AES-256 encryption for your data.",
-    icon: <Lock className="text-blue-500" size={24} />,
+    icon: <Shield className="text-blue-500" size={24} />,
   },
   {
     title: "Local Decryption",
@@ -31,6 +33,7 @@ const features = [
 ];
 
 const Login = ({ isOpen, onClose, onSwitchToSignup }) => {
+  const navigate = useNavigate(); // ✅ Initialize navigate
   const [index, setIndex] = useState(0);
   const [view, setView] = useState("login"); // "login" or "forgot"
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -38,6 +41,7 @@ const Login = ({ isOpen, onClose, onSwitchToSignup }) => {
   const [errors, setErrors] = useState({});
   const [successMsg, setSuccessMsg] = useState("");
   const [showResetSuccess, setShowResetSuccess] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
 
   useEffect(() => {
     let timer;
@@ -73,8 +77,12 @@ const Login = ({ isOpen, onClose, onSwitchToSignup }) => {
       if (res.ok) {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-        setSuccessMsg("Vault Unlocked!");
-        setTimeout(() => onClose(), 1500);
+        setIsUnlocking(true);
+        setTimeout(() => {
+          setIsUnlocking(false);
+          onClose();
+          navigate("/dashboard"); // Redirect to dashboard
+        }, 2500);
       } else {
         setErrors({ server: data.msg || "Login failed" });
       }
@@ -119,6 +127,10 @@ const Login = ({ isOpen, onClose, onSwitchToSignup }) => {
 };
 
   return (
+    <>
+    <AnimatePresence>
+        {isUnlocking && <VaultLoader mode="unlocking" />}
+      </AnimatePresence>
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6">
@@ -308,6 +320,7 @@ const Login = ({ isOpen, onClose, onSwitchToSignup }) => {
         </div>
       )}
     </AnimatePresence>
+    </>
   );
 };
 

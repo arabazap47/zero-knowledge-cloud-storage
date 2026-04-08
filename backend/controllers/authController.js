@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
@@ -71,11 +72,13 @@ export const verifyOtp = async (req, res) => {
 
 // --- SIGNUP ---
 export const signup = async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password  } = req.body;
 
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ msg: "User already exists" });
+
+    const salt = crypto.randomBytes(16).toString("hex");
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -83,6 +86,8 @@ export const signup = async (req, res) => {
       name, // Matches your UI 'Full Name'
       email,
       password: hashedPassword,
+      salt: salt,
+      plan: "free"
     });
 
     res.json({ msg: "User created successfully" });
@@ -107,9 +112,9 @@ export const login = async (req, res) => {
     });
 
     // Don't send the hashed password back to the frontend
-    const { password: _, ...userWithoutPassword } = user._doc;
+    const { password: _, ...safeUser  } = user._doc;
 
-    res.json({ token, user: userWithoutPassword });
+    res.json({ token, user: safeUser  });
   } catch (err) {
     res.status(500).json(err);
   }

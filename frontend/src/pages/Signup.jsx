@@ -106,6 +106,7 @@ const Signup = ({ isOpen, onClose, onSwitchToLogin }) => {
   };
 
   const handleSignup = async () => {
+
     if (!validateForm()) return;
 
     try {
@@ -115,7 +116,7 @@ const Signup = ({ isOpen, onClose, onSwitchToLogin }) => {
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
-          password: formData.password
+          password: formData.password,
         }),
       });
       const data = await response.json();
@@ -146,6 +147,7 @@ const Signup = ({ isOpen, onClose, onSwitchToLogin }) => {
   setErrors({});
   setShowSuccess(false);
 };
+
 
   return (
     <AnimatePresence>

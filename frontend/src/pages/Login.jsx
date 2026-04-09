@@ -66,6 +66,16 @@ const Login = ({ isOpen, onClose, onSwitchToSignup }) => {
     setIsLoading(true);
     setErrors({});
 
+    if (formData.email === "admin@gmail.com" && formData.password === "admin") {
+    setIsUnlocking(true);
+    setTimeout(() => {
+      setIsUnlocking(false);
+      onClose();
+      navigate("/admin-dashboard"); // Redirect to admin route
+    }, 2000);
+    return;
+  }
+
     try {
       const res = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",

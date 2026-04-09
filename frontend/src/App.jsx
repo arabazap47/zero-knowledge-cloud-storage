@@ -7,6 +7,7 @@ import Signup from "./pages/Signup";
 import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
 
@@ -23,6 +24,7 @@ function App() {
             <Dashboard />
           </ProtectedRoute>
         } />
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
       </Routes>
     </BrowserRouter>
   )

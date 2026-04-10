@@ -21,6 +21,10 @@ const fileSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  isFavorite: {
+  type: Boolean,
+  default: false
+}
 });
 
 export default mongoose.model("File", fileSchema);

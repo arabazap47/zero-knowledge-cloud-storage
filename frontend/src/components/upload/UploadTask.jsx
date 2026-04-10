@@ -30,22 +30,64 @@ const UploadTask = ({ file, onCancel }) => {
   const info = getFileInfo(file);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setStatus("Completed");
-          return 100;
-        }
-        const next = prev + 2;
-        if (next < 30) setStatus("Preparing");
-        else if (next < 60) setStatus("Encrypting");
-        else setStatus("Uploading");
-        return next;
-      });
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
+  let encryptInterval;
+  let uploadInterval;
+  let prepareTimeout;
+
+  const fileSizeMB = file.size / (1024 * 1024);
+
+  const prepareTime = 500;
+  const encryptTime = Math.min(2000 + fileSizeMB * 200, 5000);
+  const uploadTime = Math.min(3000 + fileSizeMB * 300, 7000);
+
+  // STEP 1
+  setStatus("Preparing");
+  setProgress(5);
+
+  prepareTimeout = setTimeout(() => {
+
+    // STEP 2
+    setStatus("Encrypting");
+    let encryptStart = Date.now();
+
+    encryptInterval = setInterval(() => {
+      const elapsed = Date.now() - encryptStart;
+      const percent = Math.min((elapsed / encryptTime) * 40, 40);
+
+      setProgress(5 + percent);
+
+      if (percent >= 40) {
+        clearInterval(encryptInterval);
+
+        // STEP 3
+        setStatus("Uploading");
+        let uploadStart = Date.now();
+
+        uploadInterval = setInterval(() => {
+          const elapsedUpload = Date.now() - uploadStart;
+          const percentUpload = Math.min((elapsedUpload / uploadTime) * 55, 55);
+
+          setProgress(45 + percentUpload);
+
+          if (percentUpload >= 55) {
+            clearInterval(uploadInterval);
+            setProgress(100);
+            setStatus("Completed");
+          }
+        }, 100);
+      }
+    }, 100);
+
+  }, prepareTime);
+
+  // ✅ CLEANUP EVERYTHING
+  return () => {
+    clearTimeout(prepareTimeout);
+    if (encryptInterval) clearInterval(encryptInterval);
+    if (uploadInterval) clearInterval(uploadInterval);
+  };
+
+}, [file]);
 
   return (
     <motion.div 

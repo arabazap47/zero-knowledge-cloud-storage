@@ -24,6 +24,11 @@ const fileSchema = new mongoose.Schema({
   isFavorite: {
   type: Boolean,
   default: false
+},
+filePath: { type: String },
+isDeleted: {
+  type: Boolean,
+  default: false
 }
 });
 

@@ -38,8 +38,12 @@ const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess }) => {
         console.log("TOKEN:", localStorage.getItem("token"));
 
         const data = await res.json();
-        console.log("Upload response:", data);
-        onUploadSuccess();
+
+if (res.ok) {
+  onUploadSuccess(); // ✅ ONLY on success
+} else {
+  console.error("Upload failed:", data.msg);
+}
 
     } catch (err) {
         console.error("Upload failed", err);
@@ -51,13 +55,13 @@ const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess }) => {
     setIsDragging(false);
     const droppedFiles = Array.from(e.dataTransfer.files);
     if (droppedFiles.length > 0) {
-      setFiles(prev => [
-        ...droppedFiles.map(file => ({
-        file,
-        id: crypto.randomUUID() // ✅ ADD THIS
-        })),      
-        ...prev
-      ]);
+      // setFiles(prev => [
+      //   ...droppedFiles.map(file => ({
+      //   file,
+      //   id: crypto.randomUUID() // ✅ ADD THIS
+      //   })),      
+      //   ...prev
+      // ]);
       setActiveIntelligence(droppedFiles[0]);
       droppedFiles.forEach(file => handleUpload(file));
     }

@@ -56,6 +56,7 @@ export const uploadFile = async (req, res) => {
       userId,
       filename: file.originalname,
       fileUrl,
+      filePath,
       size: file.size,
     });
 
@@ -89,5 +90,81 @@ export const getFiles = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Failed to fetch files" });
+  }
+};
+
+//delete files
+export const deleteFile = async (req, res) => {
+  try {
+    const { fileId, path } = req.body;
+    const userId = req.user.id;
+
+    // 1️⃣ Find file
+    const file = await File.findById(fileId);
+    if (!file) {
+      return res.status(404).json({ msg: "File not found" });
+    }
+
+    // 2️⃣ Security check (VERY IMPORTANT 🔐)
+    if (file.userId.toString() !== userId) {
+      return res.status(403).json({ msg: "Unauthorized" });
+    }
+
+    // 3️⃣ Delete from Supabase
+    const { error } = await supabase.storage
+      .from("user-files")
+      .remove([file.filePath]);
+
+    if (error) throw error;
+
+    // 4️⃣ Delete from DB
+    await File.findByIdAndDelete(fileId);
+
+    res.json({ msg: "File deleted successfully" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Delete failed" });
+  }
+};
+
+
+//download logic
+export const downloadFile = async (req, res) => {
+  try {
+    const { path } = req.body;
+
+    const { data, error } = await supabase.storage
+      .from("user-files")
+      .createSignedUrl(path, 60); // 60 sec
+
+    if (error) throw error;
+
+    res.json({ url: data.signedUrl });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Download failed" });
+  }
+}; 
+
+
+//favorite logic
+
+export const toggleFavorite = async (req, res) => {
+  try {
+    const { fileId } = req.body;
+
+    const file = await File.findById(fileId);
+    if (!file) return res.status(404).json({ msg: "File not found" });
+
+    file.isFavorite = !file.isFavorite;
+    await file.save();
+
+    res.json({ msg: "Updated", file });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Favorite failed" });
   }
 };

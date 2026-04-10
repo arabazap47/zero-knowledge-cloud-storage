@@ -12,6 +12,14 @@ const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess }) => {
   const [files, setFiles] = useState([]);
   const [activeIntelligence, setActiveIntelligence] = useState(null);
 
+
+    useEffect(() => {
+      if (!isOpen) {
+        setFiles([]);
+        setActiveIntelligence(null);
+      }
+    }, [isOpen]);
+
   // ✅ ADD THIS FUNCTION
     const handleUpload = async (file) => {
     try {
@@ -43,25 +51,38 @@ const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess }) => {
     setIsDragging(false);
     const droppedFiles = Array.from(e.dataTransfer.files);
     if (droppedFiles.length > 0) {
-      setFiles(prev => [...droppedFiles, ...prev]);
+      setFiles(prev => [
+        ...droppedFiles.map(file => ({
+        file,
+        id: crypto.randomUUID() // ✅ ADD THIS
+        })),      
+        ...prev
+      ]);
       setActiveIntelligence(droppedFiles[0]);
       droppedFiles.forEach(file => handleUpload(file));
     }
-  }, []);
+  }, [handleUpload]);
 
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     if (selectedFiles.length > 0) {
-      setFiles(prev => [...selectedFiles, ...prev]);
+      setFiles(prev => [
+        ...selectedFiles.map(file => ({
+        file,
+        id: crypto.randomUUID() // ✅ ADD THIS
+      })),
+      ...prev
+]);
+
       setActiveIntelligence(selectedFiles[0]);
       selectedFiles.forEach(file => handleUpload(file));
     }
   };
 
   // ✅ FIX: use updated state instead of old "files"
-const removeFile = (index) => {
+const removeFile = (id) => {
   setFiles(prev => {
-    const updated = prev.filter((_, i) => i !== index);
+    const updated = prev.filter(item => item.id !== id);
 
     // FIX: correct logic using updated array
     if (updated.length === 0) {
@@ -94,7 +115,11 @@ const removeFile = (index) => {
           >
             {/* Close Button */}
             <button 
-              onClick={onClose}
+              onClick={() => {
+                setFiles([]);                
+                setActiveIntelligence(null); 
+                onClose();
+              }}
               className="absolute top-2 right-2 md:top-6 md:right-6 z-[999] p-2 rounded-full bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all"
             >
               <X size={20} />
@@ -154,17 +179,20 @@ const removeFile = (index) => {
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Queue ({files.length})</h4>
                   {files.length > 0 && (
-                    <button onClick={() => setFiles([])} className="text-[10px] text-red-400 hover:underline">Clear All</button>
+                    <button onClick={() => {setFiles([])
+                      setActiveIntelligence(null);
+                      onClose();
+                    }} className="text-[10px] text-red-400 hover:underline">Clear All</button>
                   )}
                 </div>
                 
                 <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2">
                   <AnimatePresence initial={false}>
-                    {files.map((file, idx) => (
+                    {files.map((item) => (
                       <UploadTask 
-                        key={`${file.name}-${idx}`} 
-                        file={file} 
-                        onCancel={() => removeFile(idx)} 
+                        key={item.id}             
+                        file={item.file}  
+                        onCancel={() => removeFile(item.id)} 
                       />
                     ))}
                     {files.length === 0 && (

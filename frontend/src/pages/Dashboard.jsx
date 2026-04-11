@@ -43,6 +43,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("My Files");
 
   const [storage, setStorage] = useState({ used: 45, total: 100 });
+  const [search, setSearch] = useState("");
 
   const searchVariants = {
     closed: { width: "40px", background: "rgba(255, 255, 255, 0)" },
@@ -66,19 +67,21 @@ const Dashboard = () => {
 }, [activeMenu]);
 
   const fetchFiles = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/files", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+  try {
+    const endpoint =
+      activeTab === "Trash"
+        ? "http://localhost:5000/api/files/trash"
+        : "http://localhost:5000/api/files";
 
-      const data = await res.json();
+    const res = await fetch(endpoint, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
 
-      console.log("API response:", data); // debug
+    const data = await res.json();
 
-      // ✅ FIXED
-      setFiles(data.files || []);
+    setFiles(data.files || []);
 
       setStorage({
         used: data.used ? Math.round(data.used / (1024 * 1024)) : 0,
@@ -91,7 +94,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchFiles();
-  }, []);
+  }, [activeTab]);
 
   const handleUpdateName = async () => {
     const updatedUser = { ...user, name: newName };
@@ -110,25 +113,49 @@ const Dashboard = () => {
     }, 2000);
   };
   //file download
-  const handleDownload = async (file) => {
-    const path = file.fileUrl.split(".com/")[1];
-
+ const handleDownload = async (file) => {
+  try {
     const res = await fetch("http://localhost:5000/api/files/download", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-      body: JSON.stringify({ path }),
+      body: JSON.stringify({ path: file.filePath }),
     });
 
     const data = await res.json();
-    window.open(data.url, "_blank");
-  };
+
+    if (!res.ok || !data.url) {
+      console.error("Download failed");
+      return;
+    }
+
+    // 🔥 FETCH FILE AS BLOB
+    const fileRes = await fetch(data.url);
+    const blob = await fileRes.blob();
+
+    // 🔥 CREATE DOWNLOAD LINK
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.filename; // original filename
+    document.body.appendChild(link);
+    link.click();
+
+    // cleanup
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+  } catch (err) {
+    console.error("Download error:", err);
+  }
+};
 
   //delete function
   const handleDelete = async (file) => {
-    const path = file.fileUrl.split(".com/")[1];
+    // const path = file.fileUrl.split(".com/")[1];
+    const path = file.filePath;
 
     await fetch("http://localhost:5000/api/files/delete", {
       method: "POST",
@@ -174,10 +201,46 @@ const Dashboard = () => {
 
   // 3. FILTER LOGIC
   const filteredFiles = files.filter((file) => {
-    if (activeTab === "Favorites") return file.isFavorite;
-    if (activeTab === "Trash") return file.isDeleted; // If you implement soft delete
-    return true; // "My Files" shows all
+  // ❌ Hide deleted files from My Files
+  if (activeTab === "My Files" && file.isDeleted) return false;
+
+  // ⭐ Favorites tab
+  if (activeTab === "Favorites" && (!file.isFavorite || file.isDeleted)) return false;
+
+  // 🗑️ Trash tab
+  if (activeTab === "Trash" && !file.isDeleted) return false;
+
+  // 🔍 Search filter
+  return file.filename.toLowerCase().includes(search.toLowerCase());
+});
+
+// 🔄 Restore
+const handleRestore = async (file) => {
+  await fetch("http://localhost:5000/api/files/restore", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+    body: JSON.stringify({ fileId: file._id }),
   });
+
+  fetchFiles();
+};
+
+// ❌ Permanent delete
+const handlePermanentDelete = async (file) => {
+  await fetch("http://localhost:5000/api/files/delete-permanent", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+    body: JSON.stringify({ fileId: file._id }),
+  });
+
+  fetchFiles();
+};
 
   const menuItems = [
     { name: "My Files", icon: <Folder size={20} />, active: true },
@@ -303,6 +366,8 @@ const Dashboard = () => {
               <input
                 type="text"
                 placeholder="Search Files..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="w-full bg-white/[0.03] border border-white/10 rounded-xl py-2.5 pl-12 pr-4 outline-none focus:border-blue-500/50 text-sm"
               />
             </div>
@@ -442,6 +507,8 @@ const Dashboard = () => {
             handleDownload={handleDownload}
             handleDelete={handleDelete}
             toggleFavorite={toggleFavorite}
+            handleRestore={handleRestore}
+            handlePermanentDelete={handlePermanentDelete}
             isFavorite={file.isFavorite}
           />
         ))
@@ -553,7 +620,7 @@ const Dashboard = () => {
 };
 
 // ... FileCard component remains the same
-const FileCard = ({ file, name, date, activeMenu, setActiveMenu, handleDownload, handleDelete, toggleFavorite, icon = "file" }) => {
+const FileCard = ({ file, name, date, activeMenu, setActiveMenu, handleDownload, handleDelete, toggleFavorite, icon = "file", handleRestore, handlePermanentDelete }) => {
   const isOpen = activeMenu === file?._id;
 
   // Helper to run action and close menu instantly
@@ -623,13 +690,30 @@ const FileCard = ({ file, name, date, activeMenu, setActiveMenu, handleDownload,
                       onClick={() => runAction(() => handleDownload(file))} 
                     />
                     <div className="h-px bg-white/5 mx-2 my-1" />
-                    <CompactMenuItem 
-                      icon={<Trash2 size={16} className="text-red-500" />} 
-                      label="Delete" 
-                      variant="danger"
-                      onClick={() => runAction(() => handleDelete(file))} 
-                    />
-                  </div>
+                    {file.isDeleted ? (
+  <>
+    <CompactMenuItem 
+      icon={<Check size={16} className="text-green-400" />} 
+      label="Restore" 
+      onClick={() => runAction(() => handleRestore(file))} 
+    />
+
+    <CompactMenuItem 
+      icon={<Trash2 size={16} className="text-red-500" />} 
+      label="Delete Forever" 
+      variant="danger"
+      onClick={() => runAction(() => handlePermanentDelete(file))} 
+    />
+  </>
+) : (
+  <CompactMenuItem 
+    icon={<Trash2 size={16} className="text-red-500" />} 
+    label="Delete" 
+    variant="danger"
+    onClick={() => runAction(() => handleDelete(file))} 
+  />
+)}
+</div>
                 </motion.div>
               </>
             )}

@@ -23,6 +23,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import VaultLoader from "../components/VaultLoader";
 import CypherVaultUpload from "./CypherVaultUpload"; // ✅ Import your new Modal
+import { decryptFile, generateKey  } from "../utils/encryption";
+import { deriveKey, decryptFileChunks } from "../utils/cryptoEngine";
+
 
 const Dashboard = () => {
   const [isClosing, setIsClosing] = useState(false);
@@ -41,15 +44,16 @@ const Dashboard = () => {
   const [files, setFiles] = useState([]);
   const [activeMenu, setActiveMenu] = useState(null);
   const [activeTab, setActiveTab] = useState("My Files");
-
+  
   const [storage, setStorage] = useState({ used: 45, total: 100 });
   const [search, setSearch] = useState("");
-
+  
   const searchVariants = {
     closed: { width: "40px", background: "rgba(255, 255, 255, 0)" },
     open: { width: "100%", background: "rgba(255, 255, 255, 0.05)" },
   };
-
+  const SECRET_KEY = "my-super-secret-key";
+  
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -112,9 +116,14 @@ const Dashboard = () => {
       navigate("/");
     }, 2000);
   };
-  //file download
- const handleDownload = async (file) => {
+
+const handleDownload = async (file) => {
   try {
+    const password = sessionStorage.getItem("vaultKey");
+    const user = JSON.parse(localStorage.getItem("user"));
+
+    const key = await deriveKey(password, user._id);
+
     const res = await fetch("http://localhost:5000/api/files/download", {
       method: "POST",
       headers: {
@@ -126,29 +135,22 @@ const Dashboard = () => {
 
     const data = await res.json();
 
-    if (!res.ok || !data.url) {
-      console.error("Download failed");
-      return;
-    }
+    const encryptedRes = await fetch(data.url);
+    const encryptedText = await encryptedRes.text();
 
-    // 🔥 FETCH FILE AS BLOB
-    const fileRes = await fetch(data.url);
-    const blob = await fileRes.blob();
+    // 🔓 decrypt chunks
+    const decryptedBlob = await decryptFileChunks(encryptedText, key);
 
-    // 🔥 CREATE DOWNLOAD LINK
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(decryptedBlob);
+
     const link = document.createElement("a");
     link.href = url;
-    link.download = file.filename; // original filename
-    document.body.appendChild(link);
+    link.download = file.filename.replace(".enc", "");
     link.click();
 
-    // cleanup
-    link.remove();
-    window.URL.revokeObjectURL(url);
-
-  } catch (err) {
-    console.error("Download error:", err);
+    URL.revokeObjectURL(url);
+    } catch (err) {
+    console.error("Download failed:", err);
   }
 };
 

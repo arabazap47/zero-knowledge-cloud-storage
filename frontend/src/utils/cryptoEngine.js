@@ -79,3 +79,94 @@ export async function decryptFileChunks(encryptedJson, key) {
 
   return new Blob([merged]);
 }
+export function generateFileKey() {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array));
+}
+export async function encryptFileKey(fileKey, password) {
+  const enc = new TextEncoder();
+
+  // 🔑 Step 1: derive AES key from password
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  const derivedKey = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: enc.encode("cyphervault-salt"), // fixed salt (can improve later)
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+
+  // 🔐 Step 2: encrypt FileKey
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    derivedKey,
+    enc.encode(fileKey)
+  );
+
+  return JSON.stringify({
+    iv: Array.from(iv),
+    data: Array.from(new Uint8Array(encrypted)),
+  });
+}
+export async function getFileHash(file) {
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function decryptFileKey(encryptedFileKey, password) {
+  const parsed = JSON.parse(encryptedFileKey);
+
+  const iv = new Uint8Array(parsed.iv);
+  const data = new Uint8Array(parsed.data);
+
+  const enc = new TextEncoder();
+
+  // 🔑 derive same key
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  const derivedKey = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: enc.encode("cyphervault-salt"),
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"]
+  );
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    derivedKey,
+    data
+  );
+
+  return new TextDecoder().decode(decrypted);
+}

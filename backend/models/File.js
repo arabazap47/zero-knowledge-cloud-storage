@@ -29,7 +29,7 @@ filePath: { type: String },
 isDeleted: {
   type: Boolean,
   default: false
-}
+},
 });
 
 export default mongoose.model("File", fileSchema);

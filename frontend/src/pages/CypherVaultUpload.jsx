@@ -6,12 +6,16 @@ import {
 import StorageIndicator from "../components/upload/StorageIndicator"
 import LiveIntelligence from "../components/upload/LiveIntelligence"
 import UploadTask from "../components/upload/UploadTask"
+import { encryptFile, generateKey } from "../utils/encryption";
+import { deriveKey, encryptFileChunks } from "../utils/cryptoEngine";
+
+
 
 const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState([]);
   const [activeIntelligence, setActiveIntelligence] = useState(null);
-
+  
 
     useEffect(() => {
       if (!isOpen) {
@@ -21,34 +25,37 @@ const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess }) => {
     }, [isOpen]);
 
   // ✅ ADD THIS FUNCTION
-    const handleUpload = async (file) => {
-    try {
-        const formData = new FormData();
-        formData.append("file", file);
 
-        const res = await fetch("http://localhost:5000/api/files/upload", {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`
-            
-        },
-        
-        body: formData
-        });
-        console.log("TOKEN:", localStorage.getItem("token"));
+const handleUpload = async (file) => {
+  try {
+    const password = sessionStorage.getItem("vaultKey");
+    const user = JSON.parse(localStorage.getItem("user"));
 
-        const data = await res.json();
+    const key = await deriveKey(password, user._id);
 
-if (res.ok) {
-  onUploadSuccess(); // ✅ ONLY on success
-} else {
-  console.error("Upload failed:", data.msg);
-}
+    const encryptedData = await encryptFileChunks(file, key);
 
-    } catch (err) {
-        console.error("Upload failed", err);
-    }
-    };
+    const encryptedBlob = new Blob([encryptedData], {
+      type: "application/json",
+    });
+
+    const formData = new FormData();
+formData.append("file", encryptedBlob, file.name + ".enc");
+
+    const res = await fetch("http://localhost:5000/api/files/upload", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: formData,
+    });
+
+    if (res.ok) onUploadSuccess();
+
+  } catch (err) {
+    console.error("Upload failed:", err);
+  }
+};
 
   const onDrop = useCallback((e) => {
     e.preventDefault();

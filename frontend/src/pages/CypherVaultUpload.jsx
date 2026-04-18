@@ -6,8 +6,7 @@ import {
 import StorageIndicator from "../components/upload/StorageIndicator"
 import LiveIntelligence from "../components/upload/LiveIntelligence"
 import UploadTask from "../components/upload/UploadTask"
-import { encryptFile, generateKey } from "../utils/encryption";
-import { deriveKey, encryptFileChunks } from "../utils/cryptoEngine";
+import { deriveKey, encryptFileChunks, encryptFileKey, generateFileKey } from "../utils/cryptoEngine";
 
 
 
@@ -24,14 +23,29 @@ const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess }) => {
       }
     }, [isOpen]);
 
-  // ✅ ADD THIS FUNCTION
+  async function getFileHash(file) {
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 const handleUpload = async (file) => {
   try {
     const password = sessionStorage.getItem("vaultKey");
     const user = JSON.parse(localStorage.getItem("user"));
 
-    const key = await deriveKey(password, user._id);
+    const fileHash = await getFileHash(file);
+
+// 2️⃣ generate file key
+    const fileKey = generateFileKey();
+
+// 3️⃣ encrypt file key with user key
+    const encryptedFileKey = await encryptFileKey(fileKey, password);
+
+    const key = await deriveKey(fileKey, user._id);
 
     const encryptedData = await encryptFileChunks(file, key);
 
@@ -40,7 +54,9 @@ const handleUpload = async (file) => {
     });
 
     const formData = new FormData();
-formData.append("file", encryptedBlob, file.name + ".enc");
+    formData.append("fileHash", fileHash);
+    formData.append("encryptedFileKey", encryptedFileKey);
+    formData.append("file", encryptedBlob, file.name + ".enc");
 
     const res = await fetch("http://localhost:5000/api/files/upload", {
       method: "POST",

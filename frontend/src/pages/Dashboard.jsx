@@ -23,8 +23,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import VaultLoader from "../components/VaultLoader";
 import CypherVaultUpload from "./CypherVaultUpload"; // ✅ Import your new Modal
-import { decryptFile, generateKey  } from "../utils/encryption";
-import { deriveKey, decryptFileChunks } from "../utils/cryptoEngine";
+import { deriveKey, decryptFileChunks, decryptFileKey } from "../utils/cryptoEngine";
 
 
 const Dashboard = () => {
@@ -120,10 +119,18 @@ const Dashboard = () => {
 const handleDownload = async (file) => {
   try {
     const password = sessionStorage.getItem("vaultKey");
+
+    // 🔥 STEP 1: decrypt FileKey
+    const fileKey = await decryptFileKey(
+      file.encryptedFileKey,
+      password
+    );
+
+    // 🔥 STEP 2: derive encryption key
     const user = JSON.parse(localStorage.getItem("user"));
+    const key = await deriveKey(fileKey, user._id);
 
-    const key = await deriveKey(password, user._id);
-
+    // 🔥 STEP 3: get signed URL
     const res = await fetch("http://localhost:5000/api/files/download", {
       method: "POST",
       headers: {
@@ -135,12 +142,17 @@ const handleDownload = async (file) => {
 
     const data = await res.json();
 
+    // 🔥 STEP 4: fetch encrypted file
     const encryptedRes = await fetch(data.url);
     const encryptedText = await encryptedRes.text();
 
-    // 🔓 decrypt chunks
-    const decryptedBlob = await decryptFileChunks(encryptedText, key);
+    // 🔥 STEP 5: decrypt chunks
+    const decryptedBlob = await decryptFileChunks(
+      encryptedText,
+      key
+    );
 
+    // 🔥 STEP 6: download
     const url = URL.createObjectURL(decryptedBlob);
 
     const link = document.createElement("a");
@@ -149,7 +161,8 @@ const handleDownload = async (file) => {
     link.click();
 
     URL.revokeObjectURL(url);
-    } catch (err) {
+
+  } catch (err) {
     console.error("Download failed:", err);
   }
 };
@@ -200,9 +213,31 @@ const handleDownload = async (file) => {
       console.error("Favorite sync failed", err);
     }
   };
+  const processedFiles = [];
+
+const fileGroups = {};
+
+files.forEach(file => {
+  if (!fileGroups[file.fileHash]) {
+    fileGroups[file.fileHash] = [];
+  }
+  fileGroups[file.fileHash].push(file);
+});
+
+Object.values(fileGroups).forEach(group => {
+  group.forEach((file, index) => {
+    processedFiles.push({
+      ...file,
+      displayName:
+        index === 0
+          ? file.filename.replace(".enc", "")
+          : file.filename.replace(".enc", "") + `(${index})`,
+    });
+  });
+});
 
   // 3. FILTER LOGIC
-  const filteredFiles = files.filter((file) => {
+  const filteredFiles = processedFiles.filter((file) => {
   // ❌ Hide deleted files from My Files
   if (activeTab === "My Files" && file.isDeleted) return false;
 
@@ -502,7 +537,7 @@ const handlePermanentDelete = async (file) => {
           <FileCard
             key={file._id}
             file={file}
-            name={file.filename}
+            name={file.displayName}
             date={file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString("en-IN") : "N/A"}
             activeMenu={activeMenu}
             setActiveMenu={setActiveMenu}

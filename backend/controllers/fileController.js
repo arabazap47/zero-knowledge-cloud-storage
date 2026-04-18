@@ -13,6 +13,8 @@ const STORAGE_LIMITS = {
 export const uploadFile = async (req, res) => {
   try {
     const file = req.file;
+    const fileHash = req.body.fileHash;
+const encryptedFileKey = req.body.encryptedFileKey;
     const userId = req.user.id;
 
     if (!file) return res.status(400).json({ msg: "No file uploaded" });
@@ -33,17 +35,31 @@ export const uploadFile = async (req, res) => {
       });
     }
 
+    // 🔥 CHECK IF FILE ALREADY EXISTS
+const existing = await File.findOne({ fileHash });
+
+if (existing) {
+  const newFile = await File.create({
+    userId,
+    filename: file.originalname,
+    filePath: existing.filePath, // reuse same file
+    fileUrl: existing.fileUrl,
+    fileHash,
+    encryptedFileKey,
+    size: file.size,
+  });
+
+  return res.json({
+    msg: "Duplicate file reused",
+    file: newFile,
+  });
+}
+
     // 4️⃣ Upload to Supabase
     const safeName = file.originalname
   .replace(/\s+/g, "_")
   .replace(/[^a-zA-Z0-9._-]/g, "");
 const filePath = `${userId}/${Date.now()}-${safeName}`;
-
-    // const { error } = await supabase.storage
-    //   .from("user-files")
-    //   .upload(filePath, file.buffer, {
-    //     contentType: file.mimetype,
-    //   });
 
     const { data, error } = await supabase.storage
   .from("user-files")
@@ -53,6 +69,9 @@ const filePath = `${userId}/${Date.now()}-${safeName}`;
 
 console.log("UPLOAD RESPONSE:", data);
 console.log("UPLOAD ERROR:", error);
+console.log("BODY:", req.body);
+console.log("fileHash:", req.body.fileHash);
+console.log("encryptedFileKey:", req.body.encryptedFileKey);
 
 if (error) {
   return res.status(500).json({ msg: error.message });
@@ -77,6 +96,8 @@ const fileUrl = publicUrlData.publicUrl;
       filename: file.originalname,
       fileUrl,
       filePath,
+      fileHash,           // 🔥 ADD
+      encryptedFileKey,  
       size: file.size,
     });
 
@@ -192,24 +213,6 @@ export const restoreFile = async (req, res) => {
 };
 
 
-//download logic
-// export const downloadFile = async (req, res) => {
-//   try {
-//     const { path } = req.body;
-
-//     const { data, error } = await supabase.storage
-//       .from("user-files")
-//       .createSignedUrl(path, 60); // 60 sec
-// console.log(error);
-//     if (error) throw error;
-// console.log(req.body.path);
-//     res.json({ url: data.signedUrl });
-
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ msg: "Download failed" });
-//   }
-// }; 
 export const downloadFile = async (req, res) => {
   try {
     const { path } = req.body;

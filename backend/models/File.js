@@ -30,6 +30,8 @@ isDeleted: {
   type: Boolean,
   default: false
 },
+fileHash: { type: String, required: true },
+encryptedFileKey: { type: String, required: true },
 });
 
 export default mongoose.model("File", fileSchema);

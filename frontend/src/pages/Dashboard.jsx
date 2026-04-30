@@ -23,8 +23,12 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import VaultLoader from "../components/VaultLoader";
 import CypherVaultUpload from "./CypherVaultUpload"; // ✅ Import your new Modal
-import { deriveKey, decryptFileChunks, decryptFileKey } from "../utils/cryptoEngine";
-
+import {
+  deriveKey,
+  decryptFileChunks,
+  decryptFileKey,
+  generateFileKey, encryptFileKey,
+} from "../utils/cryptoEngine";
 
 const Dashboard = () => {
   const [isClosing, setIsClosing] = useState(false);
@@ -33,58 +37,64 @@ const Dashboard = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isProfileOpen, setProfileOpen] = useState(false);
-  const [user, setUser] = useState({
-    name: "Agent",
-    email: "agent@cyphervault.com",
-    plan: "Starter",
-  });
+  const [user, setUser] = useState(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState("");
   const [files, setFiles] = useState([]);
   const [activeMenu, setActiveMenu] = useState(null);
   const [activeTab, setActiveTab] = useState("My Files");
-  
+
   const [storage, setStorage] = useState({ used: 45, total: 100 });
   const [search, setSearch] = useState("");
-  
+
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+
+  // share files states
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [sharePassword, setSharePassword] = useState("");
+  const [shareLink, setShareLink] = useState("");
+  const storagePercentage = (storage.used / storage.total) * 100;
+
   const searchVariants = {
     closed: { width: "40px", background: "rgba(255, 255, 255, 0)" },
     open: { width: "100%", background: "rgba(255, 255, 255, 0.05)" },
   };
   const SECRET_KEY = "my-super-secret-key";
-  
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      setUser(parsed);
-      setNewName(parsed.name);
+
+  const fetchUser = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/me", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      const data = await res.json();
+
+      setUser(data);
+      localStorage.setItem("user", JSON.stringify(data));
+    } catch (err) {
+      console.error("User fetch failed", err);
     }
-  }, []);
-  useEffect(() => {
-  const closeMenu = () => setActiveMenu(null);
-  if (activeMenu) {
-    window.addEventListener("click", closeMenu);
-  }
-  return () => window.removeEventListener("click", closeMenu);
-}, [activeMenu]);
+  };
 
   const fetchFiles = async () => {
-  try {
-    const endpoint =
-      activeTab === "Trash"
-        ? "http://localhost:5000/api/files/trash"
-        : "http://localhost:5000/api/files";
+    try {
+      const endpoint =
+        activeTab === "Trash"
+          ? "http://localhost:5000/api/files/trash"
+          : "http://localhost:5000/api/files";
 
-    const res = await fetch(endpoint, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
+      const res = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    setFiles(data.files || []);
+      setFiles(data.files || []);
 
       setStorage({
         used: data.used ? Math.round(data.used / (1024 * 1024)) : 0,
@@ -96,13 +106,40 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
+    fetchUser();
+    fetchFiles();
+  }, []);
+  useEffect(() => {
+    const closeMenu = () => setActiveMenu(null);
+    if (activeMenu) {
+      window.addEventListener("click", closeMenu);
+    }
+    return () => window.removeEventListener("click", closeMenu);
+  }, [activeMenu]);
+
+  useEffect(() => {
     fetchFiles();
   }, [activeTab]);
+  console.log("USER:", user);
+  if (!user) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#0a0c10] text-white">
+        {/* Glow Dot */}
+        <div className="w-6 h-6 bg-blue-500 rounded-full animate-pulse shadow-[0_0_20px_#3b82f6]"></div>
+
+        <p className="mt-4 text-sm text-gray-400">
+          Preparing your encrypted vault...
+        </p>
+      </div>
+    );
+  }
 
   const handleUpdateName = async () => {
-    const updatedUser = { ...user, name: newName };
-    setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+    const data = await res.json();
+
+    // 🔥 USE BACKEND USER (IMPORTANT)
+    setUser(data.user);
+    localStorage.setItem("user", JSON.stringify(data.user));
     setIsEditingName(false);
   };
 
@@ -116,56 +153,49 @@ const Dashboard = () => {
     }, 2000);
   };
 
-const handleDownload = async (file) => {
-  try {
-    const password = sessionStorage.getItem("vaultKey");
+  const handleDownload = async (file) => {
+    try {
+      const password = sessionStorage.getItem("vaultKey");
 
-    // 🔥 STEP 1: decrypt FileKey
-    const fileKey = await decryptFileKey(
-      file.encryptedFileKey,
-      password
-    );
+      // 🔥 STEP 1: decrypt FileKey
+      const fileKey = await decryptFileKey(file.encryptedFileKey, password);
 
-    // 🔥 STEP 2: derive encryption key
-    const user = JSON.parse(localStorage.getItem("user"));
-    const key = await deriveKey(fileKey, user._id);
+      // 🔥 STEP 2: derive encryption key
+      const user = JSON.parse(localStorage.getItem("user"));
+      const key = await deriveKey(fileKey, user._id);
 
-    // 🔥 STEP 3: get signed URL
-    const res = await fetch("http://localhost:5000/api/files/download", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify({ path: file.filePath }),
-    });
+      // 🔥 STEP 3: get signed URL
+      const res = await fetch("http://localhost:5000/api/files/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ path: file.filePath }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    // 🔥 STEP 4: fetch encrypted file
-    const encryptedRes = await fetch(data.url);
-    const encryptedText = await encryptedRes.text();
+      // 🔥 STEP 4: fetch encrypted file
+      const encryptedRes = await fetch(data.url);
+      const encryptedText = await encryptedRes.text();
 
-    // 🔥 STEP 5: decrypt chunks
-    const decryptedBlob = await decryptFileChunks(
-      encryptedText,
-      key
-    );
+      // 🔥 STEP 5: decrypt chunks
+      const decryptedBlob = await decryptFileChunks(encryptedText, key);
 
-    // 🔥 STEP 6: download
-    const url = URL.createObjectURL(decryptedBlob);
+      // 🔥 STEP 6: download
+      const url = URL.createObjectURL(decryptedBlob);
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = file.filename.replace(".enc", "");
-    link.click();
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.filename.replace(".enc", "");
+      link.click();
 
-    URL.revokeObjectURL(url);
-
-  } catch (err) {
-    console.error("Download failed:", err);
-  }
-};
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed:", err);
+    }
+  };
 
   //delete function
   const handleDelete = async (file) => {
@@ -215,69 +245,70 @@ const handleDownload = async (file) => {
   };
   const processedFiles = [];
 
-const fileGroups = {};
+  const fileGroups = {};
 
-files.forEach(file => {
-  if (!fileGroups[file.fileHash]) {
-    fileGroups[file.fileHash] = [];
-  }
-  fileGroups[file.fileHash].push(file);
-});
+  files.forEach((file) => {
+    if (!fileGroups[file.fileHash]) {
+      fileGroups[file.fileHash] = [];
+    }
+    fileGroups[file.fileHash].push(file);
+  });
 
-Object.values(fileGroups).forEach(group => {
-  group.forEach((file, index) => {
-    processedFiles.push({
-      ...file,
-      displayName:
-        index === 0
-          ? file.filename.replace(".enc", "")
-          : file.filename.replace(".enc", "") + `(${index})`,
+  Object.values(fileGroups).forEach((group) => {
+    group.forEach((file, index) => {
+      processedFiles.push({
+        ...file,
+        displayName:
+          index === 0
+            ? file.filename.replace(".enc", "")
+            : file.filename.replace(".enc", "") + `(${index})`,
+      });
     });
   });
-});
 
   // 3. FILTER LOGIC
   const filteredFiles = processedFiles.filter((file) => {
-  // ❌ Hide deleted files from My Files
-  if (activeTab === "My Files" && file.isDeleted) return false;
+    // ❌ Hide deleted files from My Files
+    if (activeTab === "My Files" && file.isDeleted) return false;
 
-  // ⭐ Favorites tab
-  if (activeTab === "Favorites" && (!file.isFavorite || file.isDeleted)) return false;
+    // ⭐ Favorites tab
+    if (activeTab === "Favorites" && (!file.isFavorite || file.isDeleted))
+      return false;
 
-  // 🗑️ Trash tab
-  if (activeTab === "Trash" && !file.isDeleted) return false;
+    // 🗑️ Trash tab
+    if (activeTab === "Trash" && !file.isDeleted) return false;
 
-  // 🔍 Search filter
-  return file.filename.toLowerCase().includes(search.toLowerCase());
-});
-
-// 🔄 Restore
-const handleRestore = async (file) => {
-  await fetch("http://localhost:5000/api/files/restore", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-    body: JSON.stringify({ fileId: file._id }),
+    // 🔍 Search filter
+    return file.filename.toLowerCase().includes(search.toLowerCase());
   });
 
-  fetchFiles();
-};
+  // 🔄 Restore
+  const handleRestore = async (file) => {
+    await fetch("http://localhost:5000/api/files/restore", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ fileId: file._id }),
+    });
 
-// ❌ Permanent delete
-const handlePermanentDelete = async (file) => {
-  await fetch("http://localhost:5000/api/files/delete-permanent", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-    body: JSON.stringify({ fileId: file._id }),
-  });
+    fetchFiles();
+  };
 
-  fetchFiles();
-};
+  // ❌ Permanent delete
+  const handlePermanentDelete = async (file) => {
+    await fetch("http://localhost:5000/api/files/delete-permanent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ fileId: file._id }),
+    });
+
+    fetchFiles();
+  };
 
   const menuItems = [
     { name: "My Files", icon: <Folder size={20} />, active: true },
@@ -287,6 +318,130 @@ const handlePermanentDelete = async (file) => {
   ];
 
   const favoriteFiles = files.filter((file) => file.isFavorite);
+
+  // payment logic
+  const plans = [
+    {
+      name: "Starter",
+      price: 0,
+      storage: 50, // ✅ 50MB FREE
+    },
+    {
+      name: "Pro",
+      price: 199,
+      storage: 100, // ✅ 100MB
+    },
+    {
+      name: "Business",
+      price: 499,
+      storage: 150, // ✅ 150MB
+    },
+  ];
+
+  const handlePayment = async (plan) => {
+    const res = await fetch("http://localhost:5000/api/payment/create-order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ amount: plan.price }),
+    });
+
+    const data = await res.json();
+
+    const options = {
+      key: "rzp_test_Sjd0in8cckhdWq", // test key
+      amount: data.amount,
+      currency: "INR",
+      name: "CypherVault",
+      description: `${plan.name} Plan`,
+      // order_id: data.id,
+      handler: async function (response) {
+        await upgradeUserPlan(plan);
+      },
+      theme: {
+        color: "#2563eb",
+      },
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
+
+  const upgradeUserPlan = async (plan) => {
+    const res = await fetch("http://localhost:5000/api/auth/update-plan", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        plan: plan.name,
+        storage: plan.storage,
+      }),
+    });
+
+    const data = await res.json();
+
+    // ✅ USE BACKEND RESPONSE
+    setUser(data.user);
+    localStorage.setItem("user", JSON.stringify(data.user));
+
+    setStorage((prev) => ({
+      ...prev,
+      total: plan.storage,
+    }));
+
+    setIsPlanModalOpen(false);
+  };
+
+  // Share Files Logic
+  const handleShare = async (file) => {
+    setSelectedFile(file);
+    setIsShareModalOpen(true);
+  };
+
+  const createShareLink = async () => {
+  try {
+    if (!sharePassword) {
+      alert("Enter password");
+      return;
+    }
+
+    const vaultKey = sessionStorage.getItem("vaultKey");
+
+    // ✅ FIXED
+    const originalFileKey = await decryptFileKey(
+      selectedFile.encryptedFileKey,
+      vaultKey
+    );
+
+    const sharedEncryptedKey = await encryptFileKey(
+      originalFileKey,
+      sharePassword
+    );
+
+    const res = await fetch("http://localhost:5000/api/share/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        fileId: selectedFile._id,
+        encryptedFileKey: sharedEncryptedKey,
+        password: sharePassword,
+        maxDownloads: 5,
+      }),
+    });
+
+    const data = await res.json();
+    setShareLink(data.link);
+
+  } catch (err) {
+    console.error("Share failed", err);
+  }
+};
 
   return (
     <div className="flex h-screen bg-[#05070a] text-white font-sans overflow-hidden">
@@ -342,7 +497,8 @@ const handlePermanentDelete = async (file) => {
           {menuItems.map((item) => (
             <button
               key={item.name}
-              onClick={() => {setActiveTab(item.name);
+              onClick={() => {
+                setActiveTab(item.name);
                 setSidebarOpen(false);
               }}
               className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
@@ -358,21 +514,45 @@ const handlePermanentDelete = async (file) => {
 
         <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 mb-6">
           <h4 className="text-sm font-semibold mb-3">Vault Capacity</h4>
+
           <div className="h-1.5 w-full bg-white/10 rounded-full mb-2 overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${(storage.used / storage.total) * 100}%` }}
-              transition={{ type: "spring", bounce: 0, duration: 1 }}
-              className="h-full bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)]"
+              animate={{ width: `${storagePercentage}%` }}
+              className={`h-full ${
+                storagePercentage > 90
+                  ? "bg-red-500"
+                  : storagePercentage > 75
+                    ? "bg-yellow-400"
+                    : "bg-blue-600"
+              }`}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-gray-500 mb-4 font-mono">
+
+          <div className="flex justify-between text-[10px] text-gray-500 mb-2 font-mono">
             <span>
               {storage.used}MB / {storage.total}MB
             </span>
           </div>
-          <button className="w-full py-2 border border-white/10 rounded-lg text-xs font-bold hover:bg-white/5 transition-all">
-            Upgrade
+
+          {/* 🚨 WARNING */}
+          {storagePercentage > 80 && (
+            <div className="text-xs text-yellow-400 mb-3">
+              ⚠️ Storage almost full. Upgrade recommended.
+            </div>
+          )}
+
+          {storagePercentage >= 100 && (
+            <div className="text-xs text-red-500 mb-3">
+              🚫 Storage full. Upload blocked.
+            </div>
+          )}
+
+          <button
+            onClick={() => setIsPlanModalOpen(true)}
+            className="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-bold"
+          >
+            Upgrade Plan
           </button>
         </div>
 
@@ -499,60 +679,71 @@ const handlePermanentDelete = async (file) => {
           </div>
 
           <div className="flex flex-col gap-6 pb-24">
-  {/* 🏷️ DYNAMIC HEADING: Shows up when you're in the Favorites tab */}
-  <AnimatePresence mode="wait">
-    {activeTab === "Favorites" && filteredFiles.length > 0 && (
-      <motion.div 
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -20 }}
-        className="flex items-center gap-3 px-2"
-      >
-        <div className="h-8 w-1 bg-yellow-500 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
-        <h2 className="text-xl font-bold tracking-widest uppercase italic text-white/90">
-          Secure Favorites
-        </h2>
-      </motion.div>
-    )}
-  </AnimatePresence>
+            {/* 🏷️ DYNAMIC HEADING: Shows up when you're in the Favorites tab */}
+            <AnimatePresence mode="wait">
+              {activeTab === "Favorites" && filteredFiles.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="flex items-center gap-3 px-2"
+                >
+                  <div className="h-8 w-1 bg-yellow-500 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
+                  <h2 className="text-xl font-bold tracking-widest uppercase italic text-white/90">
+                    Secure Favorites
+                  </h2>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-  {/* 🗂️ FILES GRID */}
-  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-    <AnimatePresence mode="popLayout">
-      {filteredFiles.length === 0 ? (
-        <motion.div
-          key="empty-state"
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="col-span-full py-20 text-center border-2 border-dashed border-white/5 rounded-[32px] bg-white/[0.01]"
-        >
-          <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Search className="text-gray-600" size={24} />
+            {/* 🗂️ FILES GRID */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <AnimatePresence mode="popLayout">
+                {filteredFiles.length === 0 ? (
+                  <motion.div
+                    key="empty-state"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="col-span-full py-20 text-center border-2 border-dashed border-white/5 rounded-[32px] bg-white/[0.01]"
+                  >
+                    <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Search className="text-gray-600" size={24} />
+                    </div>
+                    <p className="text-gray-500 font-medium">
+                      No items found in {activeTab}
+                    </p>
+                    <p className="text-gray-700 text-xs mt-1">
+                      Your encrypted vault is empty here.
+                    </p>
+                  </motion.div>
+                ) : (
+                  filteredFiles.map((file) => (
+                    <FileCard
+                      key={file._id}
+                      file={file}
+                      name={file.displayName}
+                      date={
+                        file.uploadedAt
+                          ? new Date(file.uploadedAt).toLocaleDateString(
+                              "en-IN",
+                            )
+                          : "N/A"
+                      }
+                      activeMenu={activeMenu}
+                      setActiveMenu={setActiveMenu}
+                      handleDownload={handleDownload}
+                      handleDelete={handleDelete}
+                      toggleFavorite={toggleFavorite}
+                      handleRestore={handleRestore}
+                      handlePermanentDelete={handlePermanentDelete}
+                      isFavorite={file.isFavorite}
+                      handleShare={handleShare}
+                    />
+                  ))
+                )}
+              </AnimatePresence>
+            </div>
           </div>
-          <p className="text-gray-500 font-medium">No items found in {activeTab}</p>
-          <p className="text-gray-700 text-xs mt-1">Your encrypted vault is empty here.</p>
-        </motion.div>
-      ) : (
-        filteredFiles.map((file) => (
-          <FileCard
-            key={file._id}
-            file={file}
-            name={file.displayName}
-            date={file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString("en-IN") : "N/A"}
-            activeMenu={activeMenu}
-            setActiveMenu={setActiveMenu}
-            handleDownload={handleDownload}
-            handleDelete={handleDelete}
-            toggleFavorite={toggleFavorite}
-            handleRestore={handleRestore}
-            handlePermanentDelete={handlePermanentDelete}
-            isFavorite={file.isFavorite}
-          />
-        ))
-      )}
-    </AnimatePresence>
-  </div>
-</div>
         </div>
       </main>
 
@@ -623,6 +814,14 @@ const handlePermanentDelete = async (file) => {
                   Account Status
                 </span>
                 <p className="text-xl font-bold mt-1">{user.plan} Plan</p>
+                {user.plan !== "Starter" && user.planExpiry && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Expires on{" "}
+                    <span className="text-yellow-400">
+                      {new Date(user.planExpiry).toLocaleDateString()}
+                    </span>
+                  </p>
+                )}
                 <div className="mt-6 flex flex-col gap-3">
                   <button className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-600/20 transition-all">
                     Upgrade to Enterprise
@@ -652,12 +851,147 @@ const handlePermanentDelete = async (file) => {
           UPLOAD SECURELY
         </span>
       </motion.button>
+      {isPlanModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#0a0c10] p-8 rounded-3xl w-[700px] border border-white/10"
+          >
+            <h2 className="text-2xl font-bold mb-8 text-center">
+              Upgrade Your Vault
+            </h2>
+
+            <div className="grid grid-cols-3 gap-4">
+              {plans.map((plan) => {
+                const isCurrent = user.plan === plan.name;
+
+                return (
+                  <div
+                    key={plan.name}
+                    className={`p-5 rounded-2xl border transition-all ${
+                      isCurrent
+                        ? "border-blue-500 bg-blue-600/10 scale-105"
+                        : "border-white/10 hover:border-blue-500/30"
+                    }`}
+                  >
+                    <h3 className="text-lg font-bold">{plan.name}</h3>
+
+                    <p className="text-2xl font-black mt-2">
+                      ₹{plan.price}
+                      <span className="text-xs text-gray-400"> /month</span>
+                    </p>
+
+                    <p className="text-sm text-gray-400 mt-2">
+                      {plan.storage} MB Secure Storage
+                    </p>
+
+                    <ul className="text-xs text-gray-500 mt-4 space-y-1">
+                      <li>✔ End-to-End Encryption</li>
+                      <li>✔ Secure Sharing</li>
+                      <li>✔ Zero Knowledge</li>
+                    </ul>
+
+                    {isCurrent ? (
+                      <button className="mt-5 w-full py-2 bg-gray-600 rounded-lg text-xs">
+                        Current Plan
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handlePayment(plan)}
+                        className="mt-5 w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-bold"
+                      >
+                        Upgrade
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setIsPlanModalOpen(false)}
+              className="mt-6 w-full text-gray-400 text-sm"
+            >
+              Close
+            </button>
+          </motion.div>
+        </div>
+      )}
+      {isShareModalOpen && (
+  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+    <div className="bg-[#0a0c10] p-6 rounded-2xl w-[400px] border border-white/10">
+
+      <h2 className="text-lg font-bold mb-4">Share File</h2>
+
+      {!shareLink ? (
+        <>
+          <input
+            type="password"
+            placeholder="Set password"
+            value={sharePassword}
+            onChange={(e) => setSharePassword(e.target.value)}
+            className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-sm mb-4"
+          />
+
+          <button
+            onClick={createShareLink}
+            className="w-full py-2 bg-blue-600 rounded-lg text-sm font-bold"
+          >
+            Generate Link
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="text-xs text-gray-400 mb-2">Share this link:</p>
+
+          <input
+            value={shareLink}
+            readOnly
+            className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-xs"
+          />
+
+          <button
+            onClick={() => navigator.clipboard.writeText(shareLink)}
+            className="mt-3 w-full py-2 bg-green-600 rounded-lg text-sm"
+          >
+            Copy Link
+          </button>
+        </>
+      )}
+
+      <button
+        onClick={() => {
+          setIsShareModalOpen(false);
+          setShareLink("");
+          setSharePassword("");
+        }}
+        className="mt-4 w-full text-gray-400 text-sm"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
     </div>
   );
 };
 
 // ... FileCard component remains the same
-const FileCard = ({ file, name, date, activeMenu, setActiveMenu, handleDownload, handleDelete, toggleFavorite, icon = "file", handleRestore, handlePermanentDelete }) => {
+const FileCard = ({
+  file,
+  name,
+  date,
+  activeMenu,
+  setActiveMenu,
+  handleDownload,
+  handleDelete,
+  toggleFavorite,
+  icon = "file",
+  handleRestore,
+  handleShare,
+  handlePermanentDelete,
+}) => {
   const isOpen = activeMenu === file?._id;
 
   // Helper to run action and close menu instantly
@@ -670,18 +1004,24 @@ const FileCard = ({ file, name, date, activeMenu, setActiveMenu, handleDownload,
     <motion.div
       layout
       className={`group relative p-4 lg:p-6 rounded-[24px] border transition-all duration-300 ${
-        isOpen ? "bg-blue-600/10 border-blue-500/40 shadow-xl" : "bg-white/[0.02] border-white/5"
+        isOpen
+          ? "bg-blue-600/10 border-blue-500/40 shadow-xl"
+          : "bg-white/[0.02] border-white/5"
       }`}
     >
       <div className="flex items-center justify-between gap-4">
         {/* Info Section */}
         <div className="flex items-center gap-4 flex-1 min-w-0">
-          <div className={`p-3 rounded-2xl transition-colors duration-300 ${isOpen ? "bg-blue-600 text-white scale-110" : "bg-white/5 text-gray-500"}`}>
+          <div
+            className={`p-3 rounded-2xl transition-colors duration-300 ${isOpen ? "bg-blue-600 text-white scale-110" : "bg-white/5 text-gray-500"}`}
+          >
             {icon === "key" ? <Key size={20} /> : <FileText size={20} />}
           </div>
           <div className="min-w-0">
             <h4 className="font-bold text-sm truncate text-white/90">{name}</h4>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5">{date}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5">
+              {date}
+            </p>
           </div>
         </div>
 
@@ -693,7 +1033,9 @@ const FileCard = ({ file, name, date, activeMenu, setActiveMenu, handleDownload,
               setActiveMenu(isOpen ? null : file._id);
             }}
             className={`p-2.5 rounded-xl z-[110] relative transition-all ${
-              isOpen ? "bg-white text-black scale-110 shadow-lg" : "text-gray-500 hover:text-white"
+              isOpen
+                ? "bg-white text-black scale-110 shadow-lg"
+                : "text-gray-500 hover:text-white"
             }`}
           >
             {isOpen ? <X size={18} /> : <MoreVertical size={18} />}
@@ -704,11 +1046,14 @@ const FileCard = ({ file, name, date, activeMenu, setActiveMenu, handleDownload,
             {isOpen && (
               <>
                 {/* Transparent Scrim to close on outside tap */}
-                <div 
-                  className="fixed inset-0 z-[100]" 
-                  onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }} 
+                <div
+                  className="fixed inset-0 z-[100]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveMenu(null);
+                  }}
                 />
-                
+
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8, x: 10, y: -10 }}
                   animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
@@ -716,41 +1061,58 @@ const FileCard = ({ file, name, date, activeMenu, setActiveMenu, handleDownload,
                   className="absolute right-0 mt-3 w-48 bg-[#0d0f14]/90 border border-white/10 rounded-[20px] shadow-2xl z-[105] overflow-hidden backdrop-blur-2xl origin-top-right"
                 >
                   <div className="p-1.5 flex flex-col gap-1">
-                    <CompactMenuItem 
-                      icon={<Star size={16} className={file.isFavorite ? "fill-yellow-400 text-yellow-400" : "text-gray-400"} />} 
-                      label={file.isFavorite ? "Unfavorite" : "Favorite"} 
-                      onClick={() => runAction(() => toggleFavorite(file._id))} 
+                    <CompactMenuItem
+                      icon={
+                        <Star
+                          size={16}
+                          className={
+                            file.isFavorite
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-gray-400"
+                          }
+                        />
+                      }
+                      label={file.isFavorite ? "Unfavorite" : "Favorite"}
+                      onClick={() => runAction(() => toggleFavorite(file._id))}
                     />
-                    <CompactMenuItem 
-                      icon={<Download size={16} className="text-blue-400" />} 
-                      label="Download" 
-                      onClick={() => runAction(() => handleDownload(file))} 
+                    <CompactMenuItem
+                      icon={<Download size={16} className="text-blue-400" />}
+                      label="Download"
+                      onClick={() => runAction(() => handleDownload(file))}
                     />
+                    <CompactMenuItem
+                          icon={<Share2 size={16} className="text-green-400" />}
+                          label="Share"
+                          onClick={() => runAction(() => handleShare(file))}
+                        />
                     <div className="h-px bg-white/5 mx-2 my-1" />
                     {file.isDeleted ? (
-  <>
-    <CompactMenuItem 
-      icon={<Check size={16} className="text-green-400" />} 
-      label="Restore" 
-      onClick={() => runAction(() => handleRestore(file))} 
-    />
+                      <>
+                        <CompactMenuItem
+                          icon={<Check size={16} className="text-green-400" />}
+                          label="Restore"
+                          onClick={() => runAction(() => handleRestore(file))}
+                        />
 
-    <CompactMenuItem 
-      icon={<Trash2 size={16} className="text-red-500" />} 
-      label="Delete Forever" 
-      variant="danger"
-      onClick={() => runAction(() => handlePermanentDelete(file))} 
-    />
-  </>
-) : (
-  <CompactMenuItem 
-    icon={<Trash2 size={16} className="text-red-500" />} 
-    label="Delete" 
-    variant="danger"
-    onClick={() => runAction(() => handleDelete(file))} 
-  />
-)}
-</div>
+                        <CompactMenuItem
+                          icon={<Trash2 size={16} className="text-red-500" />}
+                          label="Delete Forever"
+                          variant="danger"
+                          onClick={() =>
+                            runAction(() => handlePermanentDelete(file))
+                          }
+                        />
+                        
+                      </>
+                    ) : (
+                      <CompactMenuItem
+                        icon={<Trash2 size={16} className="text-red-500" />}
+                        label="Delete"
+                        variant="danger"
+                        onClick={() => runAction(() => handleDelete(file))}
+                      />
+                    )}
+                  </div>
                 </motion.div>
               </>
             )}
@@ -764,9 +1126,14 @@ const FileCard = ({ file, name, date, activeMenu, setActiveMenu, handleDownload,
 /* Micro Menu Item Component */
 const CompactMenuItem = ({ icon, label, onClick, variant = "default" }) => (
   <button
-    onClick={(e) => { e.stopPropagation(); onClick(); }}
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick();
+    }}
     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all active:scale-95 ${
-      variant === "danger" ? "hover:bg-red-500/10 text-red-400" : "hover:bg-white/5 text-white/80"
+      variant === "danger"
+        ? "hover:bg-red-500/10 text-red-400"
+        : "hover:bg-white/5 text-white/80"
     }`}
   >
     <span className="p-1.5 bg-white/5 rounded-lg">{icon}</span>

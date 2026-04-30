@@ -8,6 +8,7 @@ import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import SharePage from "./pages/SharePage";
 
 function App() {
 
@@ -25,6 +26,8 @@ function App() {
           </ProtectedRoute>
         } />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
+
+<Route path="/share/:token" element={<SharePage />} />
       </Routes>
     </BrowserRouter>
   )

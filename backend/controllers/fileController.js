@@ -5,9 +5,9 @@ import File from "../models/File.js";
 import User from "../models/User.js";
 
 const STORAGE_LIMITS = {
-  free: 50 * 1024 * 1024,       // 50MB
-  pro: 150 * 1024 * 1024,      // 150MB
-  business: 300 * 1024 * 1024 // 300MB
+  Starter: 50 * 1024 * 1024,       // 50MB
+  Pro: 100 * 1024 * 1024,      // 150MB
+  Business: 150 * 1024 * 1024 // 300MB
 };
 
 export const uploadFile = async (req, res) => {
@@ -26,13 +26,15 @@ const encryptedFileKey = req.body.encryptedFileKey;
     const files = await File.find({ userId });
     const totalUsed = files.reduce((acc, f) => acc + f.size, 0);
 
-    const limit = STORAGE_LIMITS[user.plan];
+    const limit = user.storageLimit || STORAGE_LIMITS["Starter"];
 
     // 3️⃣ Check limit
     if (totalUsed + file.size > limit) {
       return res.status(400).json({
-        msg: `Storage limit exceeded (${user.plan} plan)`
-      });
+  msg: `Storage Full ⚠️`,
+  details: `You have exceeded your ${user.plan} plan limit.`,
+  upgrade: true
+});
     }
 
     // 🔥 CHECK IF FILE ALREADY EXISTS
@@ -120,12 +122,17 @@ export const getFiles = async (req, res) => {
     const user = await User.findById(userId);
 
     const files = await File.find({ userId,  isDeleted: false }).sort({ createdAt: -1 });
-    const totalUsed = files.reduce((acc, f) => acc + f.size, 0);
+    const uniqueFiles = {};
+files.forEach(f => {
+  uniqueFiles[f.fileHash] = f;
+});
+const totalUsed = Object.values(uniqueFiles)
+  .reduce((acc, f) => acc + f.size, 0);
 
     res.json({
     files,
     used: totalUsed,
-    limit: STORAGE_LIMITS[user.plan]
+    limit: user.storageLimit || STORAGE_LIMITS["Starter"]
     });
 
   } catch (err) {

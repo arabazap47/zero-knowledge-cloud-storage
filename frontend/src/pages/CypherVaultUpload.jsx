@@ -10,10 +10,11 @@ import { deriveKey, encryptFileChunks, encryptFileKey, generateFileKey } from ".
 
 
 
-const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess }) => {
+const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess, onStorageLimit  }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState([]);
   const [activeIntelligence, setActiveIntelligence] = useState(null);
+  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   
 
     useEffect(() => {
@@ -32,21 +33,83 @@ const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess }) => {
     .join("");
 }
 
+// const handleUpload = async (file) => {
+//   try {
+//     const password = sessionStorage.getItem("vaultKey");
+//     const user = JSON.parse(localStorage.getItem("user"));
+
+//     const fileHash = await getFileHash(file);
+
+// // 2️⃣ generate file key
+//     const fileKey = generateFileKey();
+
+// // 3️⃣ encrypt file key with user key
+//     const encryptedFileKey = await encryptFileKey(fileKey, password);
+
+//     const key = await deriveKey(fileKey, user._id);
+
+//     const encryptedData = await encryptFileChunks(file, key);
+
+//     const encryptedBlob = new Blob([encryptedData], {
+//       type: "application/json",
+//     });
+
+//     const formData = new FormData();
+//     formData.append("fileHash", fileHash);
+//     formData.append("encryptedFileKey", encryptedFileKey);
+//     formData.append("file", encryptedBlob, file.name + ".enc");
+
+//     const res = await fetch("http://localhost:5000/api/files/upload", {
+//       method: "POST",
+//       headers: {
+//         Authorization: `Bearer ${localStorage.getItem("token")}`,
+//       },
+//       body: formData,
+//     });
+
+//     if (!res.ok) {
+//   const err = await res.json();
+
+//   if (err.msg === "Storage limit exceeded") {
+//     onStorageLimit();  // ✅ correct// 🚀 trigger upgrade UI
+//   }
+
+//   return;
+// }
+// const data = await res.json();
+
+// // ✅ refresh files in dashboard
+// onUploadSuccess();
+
+// // ✅ optional: clear UI
+// setFiles([]);
+// setActiveIntelligence(null);
+
+//   } catch (err) {
+//     console.error("Upload failed:", err);
+//   }
+// };
+
 const handleUpload = async (file) => {
   try {
+    const MAX_FILE_SIZE = storage.total * 1024 * 1024; // total allowed
+
+if (file.size > MAX_FILE_SIZE) {
+  console.log("File too large");
+
+  setShowUpgradePopup(true); // 🚀 show upgrade
+
+  return; // ❌ STOP upload immediately
+}
     const password = sessionStorage.getItem("vaultKey");
     const user = JSON.parse(localStorage.getItem("user"));
 
     const fileHash = await getFileHash(file);
 
-// 2️⃣ generate file key
     const fileKey = generateFileKey();
-
-// 3️⃣ encrypt file key with user key
     const encryptedFileKey = await encryptFileKey(fileKey, password);
 
-    const key = await deriveKey(fileKey, user._id);
-
+    const key = await deriveKey(fileKey, "cyphervault");
     const encryptedData = await encryptFileChunks(file, key);
 
     const encryptedBlob = new Blob([encryptedData], {
@@ -66,13 +129,24 @@ const handleUpload = async (file) => {
       body: formData,
     });
 
-    if (res.ok) onUploadSuccess();
+    if (!res.ok) {
+      const err = await res.json();
+
+      if (err.msg === "Storage limit exceeded") {
+        setShowUpgradePopup(true); // ✅ better UX
+      }
+
+      return;
+    }
+
+    const data = await res.json();
+
+    onUploadSuccess(); // refresh dashboard
 
   } catch (err) {
     console.error("Upload failed:", err);
   }
 };
-
   const onDrop = useCallback((e) => {
     e.preventDefault();
     setIsDragging(false);
@@ -122,6 +196,31 @@ const removeFile = (id) => {
 
   return (
     <AnimatePresence>
+      {showUpgradePopup && (
+  <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[999]">
+    <div className="bg-[#0a0c10] p-6 rounded-2xl border border-white/10 text-center w-[300px]">
+      
+      <h2 className="text-red-500 font-bold text-lg">
+        🚫 Storage Full
+      </h2>
+
+      <p className="text-xs text-gray-400 mt-2">
+        Upgrade your plan to upload more files
+      </p>
+
+      <button
+        onClick={() => {
+          setShowUpgradePopup(false);
+          onClose();
+          onStorageLimit(); // 🚀 open plan modal
+        }}
+        className="mt-4 w-full py-2 bg-blue-600 rounded-lg text-sm font-bold"
+      >
+        Upgrade Now
+      </button>
+    </div>
+  </div>
+)}
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-start md:items-center justify-center p-3 sm:p-6 overflow-y-auto">
           {/* Backdrop */}
@@ -240,6 +339,7 @@ const removeFile = (id) => {
         </div>
       )}
     </AnimatePresence>
+    
   );
 };
 

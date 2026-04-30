@@ -6,7 +6,17 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   isVerified: { type: Boolean, default: false }, // For your OTP logic
   salt: { type: String, required: true },
-  plan: { type: String, enum: ["free", "pro", "Business"], default: "free" }
+  plan: { 
+  type: String, 
+  enum: ["Starter", "Pro", "Business"], 
+  default: "Starter" 
+},
+
+storageLimit: {
+  type: Number,
+  default: 50 * 1024 * 1024 // 50MB
+},
+planExpiry: Date,
 }, { timestamps: true });
 
 export default mongoose.model("User", userSchema);

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VaultLoader from "../components/VaultLoader";
+import FilePreviewModal from "../components/FilePreviewModal";
 import CypherVaultUpload from "./CypherVaultUpload"; // ✅ Import your new Modal
 import {
   deriveKey,
@@ -57,6 +58,11 @@ const Dashboard = () => {
   const [shareLink, setShareLink] = useState("");
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
 const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+
+const [previewFile, setPreviewFile] = useState(null);
+const [previewUrl, setPreviewUrl] = useState("");
+const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
   const storagePercentage = (storage.used / storage.total) * 100;
 
   const searchVariants = {
@@ -99,10 +105,27 @@ const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
       setFiles(data.files || []);
 
-      setStorage({
-        used: data.used ? Math.round(data.used / (1024 * 1024)) : 0,
-        total: data.limit ? Math.round(data.limit / (1024 * 1024)) : 50,
-      });
+      const userData = JSON.parse(localStorage.getItem("user"));
+
+// 🔥 calculate used storage from ALL files (not just current tab)
+const allFilesRes = await fetch("http://localhost:5000/api/files", {
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },
+});
+
+const allData = await allFilesRes.json();
+
+const totalUsedBytes = (allData.files || [])
+  .filter(f => !f.isDeleted) // exclude trash
+  .reduce((acc, f) => acc + (f.size || 0), 0);
+
+setStorage({
+  used: Math.round(totalUsedBytes / (1024 * 1024)),
+  total: userData?.storageLimit
+    ? Math.round(userData.storageLimit / (1024 * 1024))
+    : 50,
+});
     } catch (err) {
       console.error("Fetch failed", err);
     }
@@ -530,6 +553,70 @@ const createSecureLink = async () => {
   }
 };
 
+//  Preview Modal
+const handlePreview = async (file) => {
+  try {
+    const password = sessionStorage.getItem("vaultKey");
+
+    const fileKey = await decryptFileKey(file.encryptedFileKey, password);
+    const key = await importFileKey(fileKey);
+
+    const res = await fetch("http://localhost:5000/api/files/download", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ path: file.filePath }),
+    });
+
+    const data = await res.json();
+
+    const encryptedRes = await fetch(data.url);
+    const encryptedText = await encryptedRes.text();
+
+    const blob = await decryptFileChunks(encryptedText, key);
+    const url = URL.createObjectURL(blob);
+
+    // const ext = file.filename?.toLowerCase() || "";
+
+// setPreviewFile({
+//   ...file,
+//   mimeType:
+//     file.mimeType ||
+//     (ext.includes(".pdf") && "application/pdf") ||
+//     (ext.includes(".jpg") && "image/jpeg") ||
+//     (ext.includes(".jpeg") && "image/jpeg") ||
+//     (ext.includes(".png") && "image/png") ||
+//     (ext.includes(".mp4") && "video/mp4") ||
+//     (ext.includes(".mp3") && "audio/mpeg") ||
+//     "",
+// });
+const ext = file.filename?.toLowerCase() || "";
+
+const mimeType =
+  file.mimeType ||
+  (ext.includes(".pdf") && "application/pdf") ||
+  (ext.includes(".jpg") && "image/jpeg") ||
+  (ext.includes(".jpeg") && "image/jpeg") ||
+  (ext.includes(".png") && "image/png") ||
+  (ext.includes(".mp4") && "video/mp4") ||
+  (ext.includes(".mp3") && "audio/mpeg") ||
+  "";
+  setPreviewFile({
+  ...file,
+  mimeType,
+});
+console.log("PREVIEW START:", file);
+
+
+    setPreviewUrl(url);
+    setIsPreviewOpen(true);
+
+  } catch (err) {
+    console.error(err);
+  }
+};
   return (
     <div className="flex h-screen bg-[#05070a] text-white font-sans overflow-hidden">
       {/* --- MODALS & OVERLAYS --- */}
@@ -753,6 +840,7 @@ const createSecureLink = async () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
+                  
                   className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex items-center gap-4 hover:bg-white/[0.05] hover:border-blue-500/30 transition-all cursor-pointer group"
                 >
                   <Folder
@@ -809,6 +897,7 @@ const createSecureLink = async () => {
                       key={file._id}
                       file={file}
                       name={file.displayName}
+                      onPreview={handlePreview} 
                       date={
                         file.uploadedAt
                           ? new Date(file.uploadedAt).toLocaleDateString(
@@ -1096,6 +1185,12 @@ const createSecureLink = async () => {
     </div>
   </div>
 )}
+<FilePreviewModal
+  isOpen={isPreviewOpen}
+  file={previewFile}
+  url={previewUrl}
+  onClose={() => setIsPreviewOpen(false)}
+/>
     </div>
   );
 };
@@ -1103,6 +1198,7 @@ const createSecureLink = async () => {
 // ... FileCard component remains the same
 const FileCard = ({
   file,
+  onPreview,
   name,
   date,
   activeMenu,
@@ -1126,7 +1222,13 @@ const FileCard = ({
   return (
     <motion.div
       layout
-      className={`group relative p-4 lg:p-6 rounded-[24px] border transition-all duration-300 ${
+       onClick={() => {
+        
+  console.log("CLICKED FILE:", file);
+  onPreview(file);
+}}
+        
+      className={`group relative p-4 lg:p-6 rounded-[24px] border cursor-pointer transition-all duration-300 ${
         isOpen
           ? "bg-blue-600/10 border-blue-500/40 shadow-xl"
           : "bg-white/[0.02] border-white/5"
@@ -1200,6 +1302,7 @@ const FileCard = ({
                     />
                     <CompactMenuItem
                       icon={<Download size={16} className="text-blue-400" />}
+                      
                       label="Download"
                       onClick={() => runAction(() => handleDownload(file))}
                     />
@@ -1241,7 +1344,9 @@ const FileCard = ({
             )}
           </AnimatePresence>
         </div>
+        
       </div>
+      
     </motion.div>
   );
 };

@@ -14,6 +14,7 @@ const SharePage = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [fileInfo, setFileInfo] = useState(null);
+  const [timeLeft, setTimeLeft] = useState("");
 
   const handleDownload = async () => {
     try {
@@ -116,6 +117,55 @@ URL.revokeObjectURL(downloadUrl);
 useEffect(() => {
   checkLink();
 }, []);
+useEffect(() => {
+  if (!fileInfo?.createdAt) return;
+
+  const expiryTime =
+    new Date(fileInfo.createdAt).getTime() + 24 * 60 * 60 * 1000;
+
+  const interval = setInterval(() => {
+    const now = Date.now();
+    const diff = expiryTime - now;
+
+    if (diff <= 0) {
+      setTimeLeft("Expired ❌");
+      clearInterval(interval);
+      return;
+    }
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff / (1000 * 60)) % 60);
+    const seconds = Math.floor((diff / 1000) % 60);
+
+    setTimeLeft(
+      `${hours}h ${minutes}m ${seconds}s`
+    );
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, [fileInfo]);
+
+const formatFileSize = (bytes) => {
+  if (!bytes) return "0 KB";
+
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+
+  return (bytes / Math.pow(1024, i)).toFixed(1) + " " + sizes[i];
+};
+const getFileIcon = (mime) => {
+  if (!mime) return "📁";
+
+  if (mime.includes("image")) return "🖼️";
+  if (mime.includes("video")) return "🎬";
+  if (mime.includes("audio")) return "🎵";
+  if (mime.includes("pdf")) return "📕";
+  if (mime.includes("zip") || mime.includes("rar")) return "🗜️";
+  if (mime.includes("text")) return "📄";
+
+  return "📁";
+  
+};
 
 
   return (
@@ -145,13 +195,34 @@ useEffect(() => {
 </p>
 
           {/* FILE INFO */}
+          
           {fileInfo && (
-            <div className="mb-4 p-3 bg-white/5 rounded-lg text-xs text-gray-300">
-              📄 {fileInfo.fileName}
-              <br />
-              📥 {fileInfo.downloadsLeft}/{fileInfo.maxDownloads} downloads left
-            </div>
-          )}
+  <div className="mb-4 p-4 bg-white/5 rounded-xl text-sm text-gray-300 border border-white/10">
+
+    <div className="flex items-center gap-3 mb-2">
+      <span className="text-2xl">
+        {getFileIcon(fileInfo.mimeType)}
+      </span>
+
+      <div className="text-left">
+        <p className="font-medium text-white truncate max-w-[200px]">
+          {fileInfo.fileName}
+        </p>
+        <p className="text-xs text-gray-400">
+          {formatFileSize(fileInfo.fileSize)}
+        </p>
+      </div>
+    </div>
+
+    <div className="text-xs text-gray-400 mt-2">
+      📥 {fileInfo.downloadsLeft}/{fileInfo.maxDownloads} downloads left
+    </div>
+    <p className="text-xs mt-2 text-yellow-400">
+  ⏳ Expires in: {timeLeft || "Calculating..."}
+</p>
+
+  </div>
+)}
 
           {/* PASSWORD */}
           {fileInfo?.isProtected && (

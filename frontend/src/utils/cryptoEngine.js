@@ -170,3 +170,14 @@ export async function decryptFileKey(encryptedFileKey, password) {
 
   return new TextDecoder().decode(decrypted);
 }
+export async function importFileKey(fileKey) {
+  const raw = Uint8Array.from(atob(fileKey), c => c.charCodeAt(0));
+
+  return crypto.subtle.importKey(
+    "raw",
+    raw,
+    { name: "AES-GCM" },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}

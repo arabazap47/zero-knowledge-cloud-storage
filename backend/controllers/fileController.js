@@ -46,6 +46,8 @@ if (existing) {
     filename: file.originalname,
     filePath: existing.filePath, // reuse same file
     fileUrl: existing.fileUrl,
+    originalName: req.file.originalname,
+  mimeType: req.file.mimetype,
     fileHash,
     encryptedFileKey,
     size: file.size,
@@ -94,14 +96,18 @@ const fileUrl = publicUrlData.publicUrl;
 
     // 6️⃣ Save metadata
     const newFile = await File.create({
-      userId,
-      filename: file.originalname,
-      fileUrl,
-      filePath,
-      fileHash,           // 🔥 ADD
-      encryptedFileKey,  
-      size: file.size,
-    });
+  userId,
+  filename: file.originalname,
+  fileUrl,
+  filePath,
+  fileHash,
+  encryptedFileKey,
+  size: file.size,
+
+  // 🔥 ADD THESE (CRITICAL)
+  originalName: file.originalname,
+  mimeType: file.mimetype,
+});
 
     res.json({
       msg: "File uploaded successfully",

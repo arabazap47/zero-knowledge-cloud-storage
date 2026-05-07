@@ -6,7 +6,7 @@ import {
 import StorageIndicator from "../components/upload/StorageIndicator"
 import LiveIntelligence from "../components/upload/LiveIntelligence"
 import UploadTask from "../components/upload/UploadTask"
-import { deriveKey, encryptFileChunks, encryptFileKey, generateFileKey } from "../utils/cryptoEngine";
+import { deriveKey, encryptFileChunks, encryptFileKey, generateFileKey,importFileKey  } from "../utils/cryptoEngine";
 
 
 
@@ -109,7 +109,7 @@ if (file.size > MAX_FILE_SIZE) {
     const fileKey = generateFileKey();
     const encryptedFileKey = await encryptFileKey(fileKey, password);
 
-    const key = await deriveKey(fileKey, "cyphervault");
+    const key = await importFileKey(fileKey);
     const encryptedData = await encryptFileChunks(file, key);
 
     const encryptedBlob = new Blob([encryptedData], {

@@ -65,7 +65,12 @@ router.post("/download", async (req, res) => {
     res.json({
   encryptedFileKey: share.encryptedFileKey,
   filePath: file.filePath,
-  ownerId: share.ownerId // 🔥 IMPORTANT
+  ownerId: share.ownerId, // 🔥 IMPORTANT
+  fileName: file.originalName || file.filename || "file",
+mimeType: file.mimeType || "application/octet-stream",
+  downloadsLeft: share.maxDownloads - share.downloadCount,
+  maxDownloads: share.maxDownloads,
+  createdAt: share.createdAt,
 });
 
   } catch (err) {

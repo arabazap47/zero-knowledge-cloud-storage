@@ -55,6 +55,8 @@ const Dashboard = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [sharePassword, setSharePassword] = useState("");
   const [shareLink, setShareLink] = useState("");
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false);
+const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const storagePercentage = (storage.used / storage.total) * 100;
 
   const searchVariants = {
@@ -398,9 +400,48 @@ const Dashboard = () => {
 
   // Share Files Logic
   const handleShare = async (file) => {
-    setSelectedFile(file);
-    setIsShareModalOpen(true);
-  };
+  setSelectedFile(file);
+  setIsShareModalOpen(true);
+
+  // reset
+  setShareLink("");
+  setSharePassword("");
+  setIsPasswordProtected(false);
+
+  try {
+    setIsGeneratingLink(true);
+
+    const vaultKey = sessionStorage.getItem("vaultKey");
+
+    const originalFileKey = await decryptFileKey(
+      file.encryptedFileKey,
+      vaultKey
+    );
+
+    // 🔓 PUBLIC LINK (NO PASSWORD)
+    const res = await fetch("http://localhost:5000/api/share/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        fileId: file._id,
+        encryptedFileKey: originalFileKey,
+        password: "",
+        maxDownloads: 5,
+      }),
+    });
+
+    const data = await res.json();
+    setShareLink(data.link);
+
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setIsGeneratingLink(false);
+  }
+};
 
   const createShareLink = async () => {
   try {
@@ -441,6 +482,51 @@ const Dashboard = () => {
 
   } catch (err) {
     console.error("Share failed", err);
+  }
+};
+
+const createSecureLink = async () => {
+  if (!sharePassword) {
+    alert("Enter password");
+    return;
+  }
+
+  try {
+    setIsGeneratingLink(true);
+
+    const vaultKey = sessionStorage.getItem("vaultKey");
+
+    const originalFileKey = await decryptFileKey(
+      selectedFile.encryptedFileKey,
+      vaultKey
+    );
+
+    const sharedEncryptedKey = await encryptFileKey(
+      originalFileKey,
+      sharePassword
+    );
+
+    const res = await fetch("http://localhost:5000/api/share/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        fileId: selectedFile._id,
+        encryptedFileKey: sharedEncryptedKey,
+        password: sharePassword,
+        maxDownloads: 5,
+      }),
+    });
+
+    const data = await res.json();
+    setShareLink(data.link);
+
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setIsGeneratingLink(false);
   }
 };
 
@@ -920,86 +1006,89 @@ const Dashboard = () => {
         </div>
       )}
       {isShareModalOpen && (
-  <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50">
-    <div className="bg-[#0a0c10] p-6 rounded-2xl w-[420px] border border-white/10 shadow-xl">
+  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+    <div className="bg-[#0a0c10] p-6 rounded-2xl w-[420px] border border-white/10">
 
-      <h2 className="text-lg font-bold mb-4 text-center">
-        🔗 Secure Share
+      <h2 className="text-lg font-bold text-center mb-4">
+        🔗 Share File
       </h2>
 
-      {/* 📄 FILE NAME */}
+      {/* FILE NAME */}
       {selectedFile && (
-        <div className="mb-3 text-xs text-gray-400 text-center">
+        <p className="text-xs text-gray-400 text-center mb-2">
           📄 {selectedFile.filename.replace(".enc", "")}
+        </p>
+      )}
+
+      {/* LINK BOX */}
+      <input
+        value={shareLink || "Generating link..."}
+        readOnly
+        className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-xs text-center mb-3"
+      />
+
+      {/* QR */}
+      {shareLink && (
+        <div className="flex justify-center mb-4">
+          <div className="bg-white p-2 rounded">
+            <QRCode value={shareLink} size={120} />
+          </div>
         </div>
       )}
 
-      {!shareLink ? (
+      {/* COPY */}
+      {shareLink && (
+        <button
+          onClick={() => navigator.clipboard.writeText(shareLink)}
+          className="w-full py-2 bg-green-600 rounded-lg text-xs font-bold mb-3"
+        >
+          Copy Link
+        </button>
+      )}
+
+      {/* TOGGLE */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs text-gray-400">
+          🔐 Password Protection
+        </span>
+
+        <button
+          onClick={() => setIsPasswordProtected(!isPasswordProtected)}
+          className={`w-10 h-5 rounded-full ${
+            isPasswordProtected ? "bg-blue-600" : "bg-gray-600"
+          }`}
+        >
+          <div
+            className={`h-5 w-5 bg-white rounded-full transform ${
+              isPasswordProtected ? "translate-x-5" : ""
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* PASSWORD INPUT */}
+      {isPasswordProtected && (
         <>
           <input
             type="password"
-            placeholder="Set share password"
+            placeholder="Set password"
             value={sharePassword}
             onChange={(e) => setSharePassword(e.target.value)}
-            className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-sm mb-4 focus:outline-none"
+            className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-xs mb-2"
           />
 
           <button
-            onClick={createShareLink}
-            className="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold"
+            onClick={createSecureLink}
+            className="w-full py-2 bg-blue-600 rounded-lg text-xs font-bold"
           >
             Generate Secure Link
           </button>
-        </>
-      ) : (
-        <>
-          {/* 🔗 LINK */}
-          <p className="text-xs text-gray-400 mb-2 text-center">
-            Share this secure link
-          </p>
-
-          <input
-            value={shareLink}
-            readOnly
-            className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-xs mb-3"
-          />
-
-          {/* 📱 QR CODE */}
-          <div className="flex justify-center mb-3">
-            <div className="bg-white p-2 rounded-lg">
-              <QRCode value={shareLink} size={120} />
-            </div>
-          </div>
-
-          {/* ACTION BUTTONS */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => navigator.clipboard.writeText(shareLink)}
-              className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-xs font-bold"
-            >
-              Copy
-            </button>
-
-            <button
-              onClick={() => {
-                setShareLink("");
-                setSharePassword("");
-              }}
-              className="flex-1 py-2 bg-yellow-600 hover:bg-yellow-500 rounded-lg text-xs font-bold"
-            >
-              New Link
-            </button>
-          </div>
         </>
       )}
 
       {/* CLOSE */}
       <button
-        onClick={() => {
-          setIsShareModalOpen(false);
-          setShareLink("");
-          setSharePassword("");
-        }}
+        onClick={() => setIsShareModalOpen(false)}
         className="mt-4 w-full text-gray-400 text-sm"
       >
         Close

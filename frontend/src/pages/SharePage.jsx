@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect  } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   decryptFileKey,
@@ -21,10 +21,13 @@ const SharePage = () => {
 
       const res = await fetch("http://localhost:5000/api/share/download", {
         method: "POST",
-        headers: {
+        headers: {  
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({
+  token,
+  password: password?.trim() || ""
+}),
       });
 
       const data = await res.json();
@@ -36,7 +39,15 @@ const SharePage = () => {
 
       setFileInfo(data);
 
-      const fileKey = await decryptFileKey(data.encryptedFileKey, password);
+      let fileKey;
+
+if (data.isProtected) {
+  // 🔐 password protected
+  fileKey = await decryptFileKey(data.encryptedFileKey, password);
+} else {
+  // 🔓 public link
+  fileKey = data.encryptedFileKey;
+}
       const key = await importFileKey(fileKey);
 
       const urlRes = await fetch("http://localhost:5000/api/share/get-file-url", {
@@ -82,8 +93,6 @@ link.click();
 
 URL.revokeObjectURL(downloadUrl);
 
-      URL.revokeObjectURL(downloadUrl);
-
     } catch (err) {
       console.error(err);
       alert("Download failed");
@@ -91,6 +100,23 @@ URL.revokeObjectURL(downloadUrl);
       setLoading(false);
     }
   };
+  const checkLink = async () => {
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/share/info/${token}`
+    );
+
+    const data = await res.json();
+    setFileInfo(data);
+
+  } catch (err) {
+    console.error(err);
+  }
+};
+useEffect(() => {
+  checkLink();
+}, []);
+
 
   return (
     <div className="min-h-screen bg-[#05070a] text-white flex flex-col">
@@ -113,8 +139,10 @@ URL.revokeObjectURL(downloadUrl);
 
           <h2 className="text-xl font-bold mb-2">🔗 Secure Share</h2>
           <p className="text-xs text-gray-400 mb-6">
-            This file is encrypted. Enter password to access.
-          </p>
+  {fileInfo?.isProtected
+    ? "🔐 Password protected file"
+    : "🔓 Public shared file"}
+</p>
 
           {/* FILE INFO */}
           {fileInfo && (
@@ -126,13 +154,15 @@ URL.revokeObjectURL(downloadUrl);
           )}
 
           {/* PASSWORD */}
-          <input
-            type="password"
-            placeholder="Enter password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-3 bg-white/5 border border-white/10 rounded-lg mb-4"
-          />
+          {fileInfo?.isProtected && (
+  <input
+    type="password"
+    placeholder="Enter password"
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+    className="w-full p-3 bg-white/5 border border-white/10 rounded-lg mb-4"
+  />
+)}
 
           {/* BUTTON */}
           <button

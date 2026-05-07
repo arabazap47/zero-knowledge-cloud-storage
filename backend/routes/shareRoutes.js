@@ -18,7 +18,7 @@ router.post("/create", verifyToken, async (req, res) => {
       fileId,
       ownerId: req.user.id,
       shareToken,
-      password, // (you can hash later)
+      password: password && password.trim() !== "" ? password : null,
       encryptedFileKey,
       maxDownloads,
     });
@@ -42,9 +42,24 @@ router.post("/download", async (req, res) => {
       return res.status(404).json({ msg: "Invalid link" });
     }
 
-    if (share.password !== password) {
-      return res.status(401).json({ msg: "Wrong password" });
-    }
+// ✅ Only check if password EXISTS AND NOT EMPTY
+console.log("DB password:", JSON.stringify(share.password));
+console.log("Incoming password:", JSON.stringify(password));
+
+const incomingPassword = (password || "").trim();
+const dbPassword = share.password;
+
+// 🔥 If NO password → public link → skip everything
+if (!dbPassword || dbPassword.trim() === "") {
+  // public link → no password check
+} else {
+  const incomingPassword = (password || "").trim();
+
+  if (dbPassword.trim() !== incomingPassword) {
+    return res.status(401).json({ msg: "Wrong password" });
+  }
+}
+
 
     if (
       share.maxDownloads &&
@@ -71,6 +86,7 @@ mimeType: file.mimeType || "application/octet-stream",
   downloadsLeft: share.maxDownloads - share.downloadCount,
   maxDownloads: share.maxDownloads,
   createdAt: share.createdAt,
+  isProtected: (share.password || "").trim().length > 0,
 });
 
   } catch (err) {
@@ -106,5 +122,30 @@ router.post("/get-file-url", async (req, res) => {
 });
 router.get("/test", (req, res) => {
   res.json({ msg: "share route working" });
+});
+
+router.get("/info/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const share = await Share.findOne({ shareToken: token });
+
+    if (!share) {
+      return res.status(404).json({ msg: "Invalid link" });
+    }
+
+    const file = await File.findById(share.fileId);
+
+    res.json({
+      fileName: file?.originalName || "file",
+      isProtected: !!(share.password && share.password.trim()),
+      maxDownloads: share.maxDownloads,
+      downloadCount: share.downloadCount,
+      createdAt: share.createdAt,
+    });
+
+  } catch (err) {
+    res.status(500).json({ msg: "Error fetching info" });
+  }
 });
 export default router;

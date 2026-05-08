@@ -31,6 +31,7 @@
     generateFileKey, encryptFileKey,importFileKey ,
   } from "../utils/cryptoEngine";
   // import { createNotification } from "../utils/sendNotification.js";
+  import TerminalMode from "../components/Terminal/TerminalMode";
   import QRCode from "react-qr-code";
 
   const Dashboard = () => {
@@ -66,7 +67,11 @@
 
   const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [terminalRef, setTerminalRef] = useState(null);
   const unreadCount = notifications.filter(n => !n.isRead).length;
+
+
 
   const fetchNotifications = async () => {
     try {
@@ -658,6 +663,11 @@ const markNotificationsAsRead = async () => {
     console.error("Mark as read failed", err);
   }
 };
+const handleTerminalUploadSuccess = (fileName) => {
+  if (terminalRef) {
+    terminalRef.addToHistory(`File uploaded: ${fileName} ✅`, "success");
+  }
+};
 
     return (
       <div className="flex h-screen bg-[#05070a] text-white font-sans overflow-hidden">
@@ -670,7 +680,10 @@ const markNotificationsAsRead = async () => {
           isOpen={isUploadModalOpen}
           onClose={() => setIsUploadModalOpen(false)}
           storage={storage}
-          onUploadSuccess={fetchFiles}
+          onUploadSuccess={(fileName) => {
+    fetchFiles();
+    handleTerminalUploadSuccess(fileName);
+  }}
         />
 
         <AnimatePresence>
@@ -833,6 +846,12 @@ const markNotificationsAsRead = async () => {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-6">
+              <button
+  onClick={() => setShowTerminal(true)}
+  className="bg-emerald-600 hover:bg-emerald-500 text-xs px-3 py-1 rounded-lg font-bold"
+>
+  Console
+</button>
               <button
     onClick={(e) => {
       e.stopPropagation();
@@ -1260,6 +1279,31 @@ const markNotificationsAsRead = async () => {
       </div>
     </div>
   )}
+
+{showTerminal && (
+  <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center">
+
+    <TerminalMode
+      refCallback={setTerminalRef}
+      userFiles={files}
+      onUpload={() => setIsUploadModalOpen(true)} // reuse your upload modal
+      onDelete={async (filename) => {
+        const file = files.find(f => f.filename === filename);
+        if (file) await handleDelete(file);
+      }}
+    />
+
+    {/* CLOSE BUTTON */}
+    <button
+      onClick={() => setShowTerminal(false)}
+      className="absolute top-6 right-6 bg-red-500 px-4 py-2 rounded-lg text-white font-bold"
+    >
+      ✕ Close
+    </button>
+
+  </div>
+)}
+
   <FilePreviewModal
     isOpen={isPreviewOpen}
     file={previewFile}

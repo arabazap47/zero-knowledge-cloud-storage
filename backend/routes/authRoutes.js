@@ -5,6 +5,7 @@ import { signup, login, sendOtp, verifyOtp, forgotPassword, resetPassword } from
 import { checkExpiry } from "../middleware/checkExpiry.js";
 import { getFiles } from "../controllers/fileController.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { createNotification } from "../utils/sendNotification.js";
 import nodemailer from "nodemailer";
 
 
@@ -40,6 +41,11 @@ router.post("/update-plan", verifyToken, async (req, res) => {
     user.planExpiry = expiry;
 
     await user.save();
+    const message = req.user?.role === "admin"
+  ? `🎯 Admin upgraded your plan to ${plan}`
+  : `🚀 You upgraded your plan to ${plan}`;
+
+await createNotification(user._id, message, "plan");
 
     // 📧 SEND EMAIL AFTER SUCCESS
     await sendEmail(
@@ -83,6 +89,12 @@ router.post("/update-plan", verifyToken, async (req, res) => {
       </div>
       `
     );
+    await createNotification(
+  user._id,
+  `🚀 Your plan upgraded to ${plan}`,
+  "plan"
+);
+    
 
     res.json({
       success: true,

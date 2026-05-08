@@ -2,7 +2,7 @@ import { Lock } from "lucide-react";
 
 export default function Hero( { onSignupClick }) {
   return (
-    <section className="relative px-8 pt-20 pb-32 bg-[#050505] text-white overflow-hidden">
+    <section className="relative px-8 pt-30 pb-32 bg-[#050505] text-white overflow-hidden">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center">
         <div className="md:w-1/2 z-10">
           <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">

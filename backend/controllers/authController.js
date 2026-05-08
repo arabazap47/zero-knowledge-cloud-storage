@@ -4,7 +4,9 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import dns from "dns";
+import { createNotification } from "../utils/sendNotification.js";
 dns.setDefaultResultOrder("ipv4first"); // ✅ fixes IPv6 issue
+
 
 // Temporary store for OTPs (Email -> OTP mapping)
 let otpStore = {}; 
@@ -71,28 +73,57 @@ export const verifyOtp = async (req, res) => {
 };
 
 // --- SIGNUP ---
+// export const signup = async (req, res) => {
+//   const { name, email, password  } = req.body;
+
+//   try {
+//     const existingUser = await User.findOne({ email });
+//     if (existingUser) return res.status(400).json({ msg: "User already exists" });
+
+//     const salt = crypto.randomBytes(16).toString("hex");
+
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     const user = await User.create({
+//       name, // Matches your UI 'Full Name'
+//       email,
+//       password: hashedPassword,
+//       salt: salt,
+//       plan: "free"
+//     });
+
+//     res.json({ msg: "User created successfully" });
+//   } catch (err) {
+//     console.error("SIGNUP ERROR:", err);  // 👈 IMPORTANT
+// res.status(500).json({ msg: "Signup failed" });
+//   }
+// };
 export const signup = async (req, res) => {
-  const { name, email, password  } = req.body;
+  const { name, email, password } = req.body;
 
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ msg: "User already exists" });
 
-    const salt = crypto.randomBytes(16).toString("hex");
-
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
-      name, // Matches your UI 'Full Name'
+      name,
       email,
       password: hashedPassword,
-      salt: salt,
-      plan: "free"
+      salt: crypto.randomBytes(16).toString("hex"),
+      plan: "Starter" // ✅ Matches the Enum in User.js
     });
 
+    // Notification logic...
+    createNotification(user._id, "🎉 Welcome to CypherVault!", "system")
+      .catch(err => console.error("Notification failed:", err));
+
     res.json({ msg: "User created successfully" });
+
   } catch (err) {
-    res.status(500).json(err);
+    console.error("🔥 SIGNUP ERROR:", err);
+    res.status(500).json({ msg: err.message });
   }
 };
 

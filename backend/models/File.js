@@ -39,7 +39,12 @@ logs: [
     timestamp: { type: Date, default: Date.now },
     user: String,
   }
-]
+],
+folderId: { 
+  type: mongoose.Schema.Types.ObjectId, 
+  ref: 'Folder', 
+  default: null 
+}
 });
 
 export default mongoose.model("File", fileSchema);

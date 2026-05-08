@@ -1,64 +1,66 @@
-  import React, { useState, useEffect } from "react";
-  import { useNavigate } from "react-router-dom";
-  import {
-    Folder,
-    FileText,
-    Search,
-    Plus,
-    Shield,
-    Star,
-    Share2,
-    Download,
-    Trash2,
-    LogOut,
-    MoreVertical,
-    Bell,
-    User,
-    Key,
-    Menu,
-    X,
-    Check,
-    Edit2,
-  } from "lucide-react";
-  import { motion, AnimatePresence } from "framer-motion";
-  import VaultLoader from "../components/VaultLoader";
-  import FilePreviewModal from "../components/FilePreviewModal";
-  import CypherVaultUpload from "./CypherVaultUpload"; // ✅ Import your new Modal
-  import {
-    deriveKey,
-    decryptFileChunks,
-    decryptFileKey,
-    generateFileKey, encryptFileKey,importFileKey ,
-  } from "../utils/cryptoEngine";
-  // import { createNotification } from "../utils/sendNotification.js";
-  import TerminalMode from "../components/Terminal/TerminalMode";
-  import QRCode from "react-qr-code";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Folder,
+  FileText,
+  Search,
+  Plus,
+  Shield,
+  Star,
+  Share2,
+  Download,
+  Trash2,
+  LogOut,
+  MoreVertical,
+  Bell,
+  User,
+  Key,
+  Menu,
+  X,
+  Check,
+  Edit2,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import VaultLoader from "../components/VaultLoader";
+import FilePreviewModal from "../components/FilePreviewModal";
+import CypherVaultUpload from "./CypherVaultUpload"; // ✅ Import your new Modal
+import {
+  deriveKey,
+  decryptFileChunks,
+  decryptFileKey,
+  generateFileKey,
+  encryptFileKey,
+  importFileKey,
+} from "../utils/cryptoEngine";
+// import { createNotification } from "../utils/sendNotification.js";
+import TerminalMode from "../components/Terminal/TerminalMode";
+import QRCode from "react-qr-code";
 
-  const Dashboard = () => {
-    const [isClosing, setIsClosing] = useState(false);
-    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false); // ✅ State for Upload Modal
-    const navigate = useNavigate();
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [isSidebarOpen, setSidebarOpen] = useState(false);
-    const [isProfileOpen, setProfileOpen] = useState(false);
-    const [user, setUser] = useState(null);
-    const [isEditingName, setIsEditingName] = useState(false);
-    const [newName, setNewName] = useState("");
-    const [files, setFiles] = useState([]);
-    const [activeMenu, setActiveMenu] = useState(null);
-    const [activeTab, setActiveTab] = useState("My Files");
+const Dashboard = () => {
+  const [isClosing, setIsClosing] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false); // ✅ State for Upload Modal
+  const navigate = useNavigate();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isProfileOpen, setProfileOpen] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [files, setFiles] = useState([]);
+  const [activeMenu, setActiveMenu] = useState(null);
+  const [activeTab, setActiveTab] = useState("My Files");
 
-    const [storage, setStorage] = useState({ used: 45, total: 100 });
-    const [search, setSearch] = useState("");
+  const [storage, setStorage] = useState({ used: 45, total: 100 });
+  const [search, setSearch] = useState("");
 
-    const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
 
-    // share files states
-    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [sharePassword, setSharePassword] = useState("");
-    const [shareLink, setShareLink] = useState("");
-    const [isPasswordProtected, setIsPasswordProtected] = useState(false);
+  // share files states
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [sharePassword, setSharePassword] = useState("");
+  const [shareLink, setShareLink] = useState("");
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
   const [previewFile, setPreviewFile] = useState(null);
@@ -69,12 +71,60 @@
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [terminalRef, setTerminalRef] = useState(null);
-  const [sortBy, setSortBy] = useState("date-desc"); // options: date-desc, date-asc, name-asc, name-desc, size-desc
-const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yesterday, week
+  const [sortBy, setSortBy] = useState("date-desc");
+  const [dateFilter, setDateFilter] = useState("all"); //
+  const [currentFolder, setCurrentFolder] = useState(null); // null = Root
+  const [folders, setFolders] = useState([]);
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
 
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    try {
+      const res = await fetch("http://localhost:5000/api/files/create-folder", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          name: newFolderName,
+          parentId: currentFolder, // This ensures sub-folders work
+        }),
+      });
 
+      if (res.ok) {
+        setNewFolderName("");
+        setIsCreatingFolder(false);
+        fetchFiles(); // Refresh UI
+      }
+    } catch (err) {
+      console.error("Folder creation failed", err);
+    }
+  };
+
+  const handleDeleteFolder = async (folderId) => {
+  if (!window.confirm("Are you sure? This will move all files inside to trash.")) return;
+  
+  try {
+    const res = await fetch("http://localhost:5000/api/files/delete-folder", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ folderId }),
+    });
+
+    if (res.ok) {
+      fetchFiles(); // Refresh UI
+    }
+  } catch (err) {
+    console.error("Delete folder failed", err);
+  }
+};
 
   const fetchNotifications = async () => {
     try {
@@ -91,432 +141,444 @@ const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yes
 
       const data = await res.json();
       setNotifications(data);
-
     } catch (err) {
       console.error("Error:", err);
     }
   };
 
-    const storagePercentage = (storage.used / storage.total) * 100;
+  const storagePercentage = (storage.used / storage.total) * 100;
 
-    const searchVariants = {
-      closed: { width: "40px", background: "rgba(255, 255, 255, 0)" },
-      open: { width: "100%", background: "rgba(255, 255, 255, 0.05)" },
-    };
-    const SECRET_KEY = "my-super-secret-key";
+  const searchVariants = {
+    closed: { width: "40px", background: "rgba(255, 255, 255, 0)" },
+    open: { width: "100%", background: "rgba(255, 255, 255, 0.05)" },
+  };
+  const SECRET_KEY = "my-super-secret-key";
 
-    const fetchUser = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/auth/me", {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
+  const fetchUser = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/me", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-        const data = await res.json();
+      const data = await res.json();
 
-        setUser(data);
-        localStorage.setItem("user", JSON.stringify(data));
-      } catch (err) {
-        console.error("User fetch failed", err);
-      }
-    };
+      setUser(data);
+      localStorage.setItem("user", JSON.stringify(data));
+    } catch (err) {
+      console.error("User fetch failed", err);
+    }
+  };
 
-    const fetchFiles = async () => {
-      try {
-        const endpoint =
-          activeTab === "Trash"
-            ? "http://localhost:5000/api/files/trash"
-            : "http://localhost:5000/api/files";
+  const fetchFiles = async () => {
+    try {
+      // Build query params for folder and tab
+      const folderParam = currentFolder ? `folderId=${currentFolder}` : "";
+      const endpoint =
+        activeTab === "Trash"
+          ? `http://localhost:5000/api/files/trash?${folderParam}`
+          : `http://localhost:5000/api/files?${folderParam}`;
 
-        const res = await fetch(endpoint, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
+      const res = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-        const data = await res.json();
+      const data = await res.json();
 
-        setFiles(data.files || []);
+      // Update both files and folders state
+      setFiles(data.files || []);
+      setFolders(data.folders || []);
 
-        const userData = JSON.parse(localStorage.getItem("user"));
+      const userData = JSON.parse(localStorage.getItem("user")); // Storage calculation remains global (all files)
 
-  // 🔥 calculate used storage from ALL files (not just current tab)
-  const allFilesRes = await fetch("http://localhost:5000/api/files", {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-  });
+      const allFilesRes = await fetch("http://localhost:5000/api/files", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-  const allData = await allFilesRes.json();
+      const allData = await allFilesRes.json();
+      const totalUsedBytes = (allData.files || [])
+        .filter((f) => !f.isDeleted)
+        .reduce((acc, f) => acc + (f.size || 0), 0);
 
-  const totalUsedBytes = (allData.files || [])
-    .filter(f => !f.isDeleted) // exclude trash
-    .reduce((acc, f) => acc + (f.size || 0), 0);
+      setStorage({
+        used: Math.round(totalUsedBytes / (1024 * 1024)),
+        total: userData?.storageLimit
+          ? Math.round(userData.storageLimit / (1024 * 1024))
+          : 50,
+      });
+    } catch (err) {
+      console.error("Fetch failed", err);
+    }
+  };
+  // Refresh content whenever the folder or the tab changes
+  useEffect(() => {
+    fetchFiles();
+  }, [currentFolder, activeTab]);
 
-  setStorage({
-    used: Math.round(totalUsedBytes / (1024 * 1024)),
-    total: userData?.storageLimit
-      ? Math.round(userData.storageLimit / (1024 * 1024))
-      : 50,
-  });
-      } catch (err) {
-        console.error("Fetch failed", err);
-      }
-    };
+  useEffect(() => {
+    const closeMenu = () => setActiveMenu(null);
+    if (activeMenu) {
+      window.addEventListener("click", closeMenu);
+    }
+    return () => window.removeEventListener("click", closeMenu);
+  }, [activeMenu]);
 
-    
-    useEffect(() => {
-      const closeMenu = () => setActiveMenu(null);
-      if (activeMenu) {
-        window.addEventListener("click", closeMenu);
-      }
-      return () => window.removeEventListener("click", closeMenu);
-    }, [activeMenu]);
+  useEffect(() => {
+    fetchFiles();
+  }, [activeTab]);
+  console.log("USER:", user);
 
-    useEffect(() => {
-      fetchFiles();
-    }, [activeTab]);
-    console.log("USER:", user);
-
-    useEffect(() => {
+  useEffect(() => {
     const close = () => setIsNotifOpen(false);
     if (isNotifOpen) window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [isNotifOpen]);
   useEffect(() => {
-  fetchUser();
-  fetchFiles();
-  fetchNotifications();
+    fetchUser();
+    fetchFiles();
+    fetchNotifications();
 
-  // Refresh notifications every 30 seconds
-  const interval = setInterval(fetchNotifications, 30000);
-  return () => clearInterval(interval);
-}, []);
-    if (!user) {
-      return (
-        <div className="h-screen flex flex-col items-center justify-center bg-[#0a0c10] text-white">
-          {/* Glow Dot */}
-          <div className="w-6 h-6 bg-blue-500 rounded-full animate-pulse shadow-[0_0_20px_#3b82f6]"></div>
+    // Refresh notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
+  if (!user) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#0a0c10] text-white">
+        {/* Glow Dot */}
+        <div className="w-6 h-6 bg-blue-500 rounded-full animate-pulse shadow-[0_0_20px_#3b82f6]"></div>
 
-          <p className="mt-4 text-sm text-gray-400">
-            Preparing your encrypted vault...
-          </p>
-        </div>
-      );
+        <p className="mt-4 text-sm text-gray-400">
+          Preparing your encrypted vault...
+        </p>
+      </div>
+    );
+  }
+
+  const handleUpdateName = async () => {
+    const data = await res.json();
+
+    // 🔥 USE BACKEND USER (IMPORTANT)
+    setUser(data.user);
+    localStorage.setItem("user", JSON.stringify(data.user));
+    setIsEditingName(false);
+  };
+
+  const handleLogout = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      setIsClosing(false);
+      navigate("/");
+    }, 2000);
+  };
+
+  const handleDownload = async (file) => {
+    try {
+      const password = sessionStorage.getItem("vaultKey");
+
+      // 🔥 STEP 1: decrypt FileKey
+      const fileKey = await decryptFileKey(file.encryptedFileKey, password);
+
+      // 🔥 STEP 2: derive encryption key
+      const user = JSON.parse(localStorage.getItem("user"));
+      const key = await importFileKey(fileKey);
+
+      // 🔥 STEP 3: get signed URL
+      const res = await fetch("http://localhost:5000/api/files/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ path: file.filePath }),
+      });
+
+      const data = await res.json();
+
+      // 🔥 STEP 4: fetch encrypted file
+      const encryptedRes = await fetch(data.url);
+      const encryptedText = await encryptedRes.text();
+
+      const decryptedBlob = await decryptFileChunks(encryptedText, key);
+
+      // 🔥 STEP 6: download
+      const url = URL.createObjectURL(decryptedBlob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.filename.replace(".enc", "");
+      link.click();
+
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed:", err);
     }
+  };
 
-    const handleUpdateName = async () => {
-      const data = await res.json();
+  //delete function
+  const handleDelete = async (file) => {
+    // const path = file.fileUrl.split(".com/")[1];
+    const path = file.filePath;
 
-      // 🔥 USE BACKEND USER (IMPORTANT)
-      setUser(data.user);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      setIsEditingName(false);
-    };
-
-    const handleLogout = () => {
-      setIsClosing(true);
-      setTimeout(() => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setIsClosing(false);
-        navigate("/");
-      }, 2000);
-    };
-
-    const handleDownload = async (file) => {
-      try {
-        const password = sessionStorage.getItem("vaultKey");
-
-        // 🔥 STEP 1: decrypt FileKey
-        const fileKey = await decryptFileKey(file.encryptedFileKey, password);
-
-        // 🔥 STEP 2: derive encryption key
-        const user = JSON.parse(localStorage.getItem("user"));
-        const key = await importFileKey(fileKey);
-
-        // 🔥 STEP 3: get signed URL
-        const res = await fetch("http://localhost:5000/api/files/download", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({ path: file.filePath }),
-        });
-
-        const data = await res.json();
-
-        // 🔥 STEP 4: fetch encrypted file
-        const encryptedRes = await fetch(data.url);
-  const encryptedText = await encryptedRes.text(); 
-
-  const decryptedBlob = await decryptFileChunks(encryptedText, key);
-
-        // 🔥 STEP 6: download
-        const url = URL.createObjectURL(decryptedBlob);
-
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = file.filename.replace(".enc", "");
-        link.click();
-
-        URL.revokeObjectURL(url);
-      } catch (err) {
-        console.error("Download failed:", err);
-      }
-    };
-
-    //delete function
-    const handleDelete = async (file) => {
-      // const path = file.fileUrl.split(".com/")[1];
-      const path = file.filePath;
-
-      await fetch("http://localhost:5000/api/files/delete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          fileId: file._id,
-          path,
-        }),
-      });
-
-      fetchFiles(); // refresh
-    };
-
-    // file favorite button
-
-    const toggleFavorite = async (fileId) => {
-      //change UI first, then call API
-      setFiles((prev) =>
-        prev.map((f) =>
-          f._id === fileId ? { ...f, isFavorite: !f.isFavorite } : f,
-        ),
-      );
-
-      try {
-        const res = await fetch("http://localhost:5000/api/files/favorite", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({ fileId }),
-        });
-        if (!res.ok) throw new Error("Sync failed");
-      } catch (err) {
-        // Rollback if API fails
-        fetchFiles();
-        console.error("Favorite sync failed", err);
-      }
-    };
-    const processedFiles = [];
-
-    const fileGroups = {};
-
-    files.forEach((file) => {
-      if (!fileGroups[file.fileHash]) {
-        fileGroups[file.fileHash] = [];
-      }
-      fileGroups[file.fileHash].push(file);
+    await fetch("http://localhost:5000/api/files/delete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        fileId: file._id,
+        path,
+      }),
     });
 
-    Object.values(fileGroups).forEach((group) => {
-      group.forEach((file, index) => {
-        processedFiles.push({
-          ...file,
-          displayName:
-            index === 0
-              ? file.filename.replace(".enc", "")
-              : file.filename.replace(".enc", "") + `(${index})`,
-        });
+    fetchFiles(); // refresh
+  };
+
+  // file favorite button
+
+  const toggleFavorite = async (fileId) => {
+    //change UI first, then call API
+    setFiles((prev) =>
+      prev.map((f) =>
+        f._id === fileId ? { ...f, isFavorite: !f.isFavorite } : f,
+      ),
+    );
+
+    try {
+      const res = await fetch("http://localhost:5000/api/files/favorite", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ fileId }),
+      });
+      if (!res.ok) throw new Error("Sync failed");
+    } catch (err) {
+      // Rollback if API fails
+      fetchFiles();
+      console.error("Favorite sync failed", err);
+    }
+  };
+  const processedFiles = [];
+
+  const fileGroups = {};
+
+  files.forEach((file) => {
+    if (!fileGroups[file.fileHash]) {
+      fileGroups[file.fileHash] = [];
+    }
+    fileGroups[file.fileHash].push(file);
+  });
+
+  Object.values(fileGroups).forEach((group) => {
+    group.forEach((file, index) => {
+      processedFiles.push({
+        ...file,
+        displayName:
+          index === 0
+            ? file.filename.replace(".enc", "")
+            : file.filename.replace(".enc", "") + `(${index})`,
       });
     });
+  });
 
-    // 3. FILTER LOGIC
-    // const filteredFiles = processedFiles.filter((file) => {
-    //   // ❌ Hide deleted files from My Files
-    //   if (activeTab === "My Files" && file.isDeleted) return false;
+  // 3. FILTER LOGIC
+  // const filteredFiles = processedFiles.filter((file) => {
+  //   // ❌ Hide deleted files from My Files
+  //   if (activeTab === "My Files" && file.isDeleted) return false;
 
-    //   // ⭐ Favorites tab
-    //   if (activeTab === "Favorites" && (!file.isFavorite || file.isDeleted))
-    //     return false;
+  //   // ⭐ Favorites tab
+  //   if (activeTab === "Favorites" && (!file.isFavorite || file.isDeleted))
+  //     return false;
 
-    //   // 🗑️ Trash tab
-    //   if (activeTab === "Trash" && !file.isDeleted) return false;
+  //   // 🗑️ Trash tab
+  //   if (activeTab === "Trash" && !file.isDeleted) return false;
 
-    //   // 🔍 Search filter
-    //   return file.filename.toLowerCase().includes(search.toLowerCase());
-    // });
+  //   // 🔍 Search filter
+  //   return file.filename.toLowerCase().includes(search.toLowerCase());
+  // });
 
-    // 1. DATE HELPERS
-    const isToday = (date) => {
-      const today = new Date();
-      return date.getDate() === today.getDate() &&
-        date.getMonth() === today.getMonth() &&
-        date.getFullYear() === today.getFullYear();
-    };
+  // 1. DATE HELPERS
+  const isToday = (date) => {
+    const today = new Date();
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
+  };
 
-    const isYesterday = (date) => {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      return date.getDate() === yesterday.getDate() &&
-        date.getMonth() === yesterday.getMonth() &&
-        date.getFullYear() === yesterday.getFullYear();
-    };
+  const isYesterday = (date) => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return (
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear()
+    );
+  };
 
-    const isWithinLastWeek = (date) => {
-      const lastWeek = new Date();
-      lastWeek.setDate(lastWeek.getDate() - 7);
-      return date >= lastWeek;
-    };
+  const isWithinLastWeek = (date) => {
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    return date >= lastWeek;
+  };
 
-    // 2. FILTER & SORT LOGIC
-    const filteredFiles = processedFiles
-      .filter((file) => {
-        if (activeTab === "My Files" && file.isDeleted) return false;
-        if (activeTab === "Favorites" && (!file.isFavorite || file.isDeleted)) return false;
-        if (activeTab === "Trash" && !file.isDeleted) return false;
-        
-        // Search filter
-        if (!file.filename.toLowerCase().includes(search.toLowerCase())) return false;
+  // 2. FILTER & SORT LOGIC
+  const filteredFiles = processedFiles
+    .filter((file) => {
+      if (activeTab === "My Files" && file.isDeleted) return false;
+      if (activeTab === "Favorites" && (!file.isFavorite || file.isDeleted))
+        return false;
+      if (activeTab === "Trash" && !file.isDeleted) return false;
 
-        // Date Period Filter
-        const fileDate = new Date(file.uploadedAt);
-        if (dateFilter === "today" && !isToday(fileDate)) return false;
-        if (dateFilter === "yesterday" && !isYesterday(fileDate)) return false;
-        if (dateFilter === "week" && !isWithinLastWeek(fileDate)) return false;
+      // Search filter
+      if (!file.filename.toLowerCase().includes(search.toLowerCase()))
+        return false;
 
-        return true;
-      })
-      .sort((a, b) => {
-        if (sortBy === "date-desc") return new Date(b.uploadedAt) - new Date(a.uploadedAt);
-        if (sortBy === "date-asc") return new Date(a.uploadedAt) - new Date(b.uploadedAt);
-        if (sortBy === "name-asc") return a.filename.localeCompare(b.filename);
-        if (sortBy === "name-desc") return b.filename.localeCompare(a.filename);
-        if (sortBy === "size-desc") return b.size - a.size;
-        return 0;
-      });
+      // Date Period Filter
+      const fileDate = new Date(file.uploadedAt);
+      if (dateFilter === "today" && !isToday(fileDate)) return false;
+      if (dateFilter === "yesterday" && !isYesterday(fileDate)) return false;
+      if (dateFilter === "week" && !isWithinLastWeek(fileDate)) return false;
 
-    // 🔄 Restore
-    const handleRestore = async (file) => {
-      await fetch("http://localhost:5000/api/files/restore", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ fileId: file._id }),
-      });
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "date-desc")
+        return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+      if (sortBy === "date-asc")
+        return new Date(a.uploadedAt) - new Date(b.uploadedAt);
+      if (sortBy === "name-asc") return a.filename.localeCompare(b.filename);
+      if (sortBy === "name-desc") return b.filename.localeCompare(a.filename);
+      if (sortBy === "size-desc") return b.size - a.size;
+      return 0;
+    });
 
-      fetchFiles();
-    };
-
-    // ❌ Permanent delete
-    const handlePermanentDelete = async (file) => {
-      await fetch("http://localhost:5000/api/files/delete-permanent", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ fileId: file._id }),
-      });
-
-      fetchFiles();
-    };
-
-    const menuItems = [
-      { name: "My Files", icon: <Folder size={20} />, active: true },
-      { name: "Favorites", icon: <Star size={20} /> },
-      { name: "Shared", icon: <Share2 size={20} /> },
-      { name: "Trash", icon: <Trash2 size={20} /> },
-    ];
-
-    const favoriteFiles = files.filter((file) => file.isFavorite);
-
-    // payment logic
-    const plans = [
-      {
-        name: "Starter",
-        price: 0,
-        storage: 50, // ✅ 50MB FREE
+  // 🔄 Restore
+  const handleRestore = async (file) => {
+    await fetch("http://localhost:5000/api/files/restore", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-      {
-        name: "Pro",
-        price: 199,
-        storage: 100, // ✅ 100MB
+      body: JSON.stringify({ fileId: file._id }),
+    });
+
+    fetchFiles();
+  };
+
+  // ❌ Permanent delete
+  const handlePermanentDelete = async (file) => {
+    await fetch("http://localhost:5000/api/files/delete-permanent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-      {
-        name: "Business",
-        price: 499,
-        storage: 200, // ✅ 150MB
+      body: JSON.stringify({ fileId: file._id }),
+    });
+
+    fetchFiles();
+  };
+
+  const menuItems = [
+    { name: "My Files", icon: <Folder size={20} />, active: true },
+    { name: "Favorites", icon: <Star size={20} /> },
+    { name: "Shared", icon: <Share2 size={20} /> },
+    { name: "Trash", icon: <Trash2 size={20} /> },
+  ];
+
+  const favoriteFiles = files.filter((file) => file.isFavorite);
+
+  // payment logic
+  const plans = [
+    {
+      name: "Starter",
+      price: 0,
+      storage: 50, // ✅ 50MB FREE
+    },
+    {
+      name: "Pro",
+      price: 199,
+      storage: 100, // ✅ 100MB
+    },
+    {
+      name: "Business",
+      price: 499,
+      storage: 200, // ✅ 150MB
+    },
+  ];
+
+  const handlePayment = async (plan) => {
+    const res = await fetch("http://localhost:5000/api/payment/create-order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    ];
+      body: JSON.stringify({ amount: plan.price }),
+    });
 
-    const handlePayment = async (plan) => {
-      const res = await fetch("http://localhost:5000/api/payment/create-order", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ amount: plan.price }),
-      });
+    const data = await res.json();
 
-      const data = await res.json();
-
-      const options = {
-        key: "rzp_test_Sjd0in8cckhdWq", // test key
-        amount: data.amount,
-        currency: "INR",
-        name: "CypherVault",
-        description: `${plan.name} Plan`,
-        // order_id: data.id,
-        handler: async function (response) {
-          await upgradeUserPlan(plan);
-        },
-        theme: {
-          color: "#2563eb",
-        },
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
+    const options = {
+      key: "rzp_test_Sjd0in8cckhdWq", // test key
+      amount: data.amount,
+      currency: "INR",
+      name: "CypherVault",
+      description: `${plan.name} Plan`,
+      // order_id: data.id,
+      handler: async function (response) {
+        await upgradeUserPlan(plan);
+      },
+      theme: {
+        color: "#2563eb",
+      },
     };
 
-    const upgradeUserPlan = async (plan) => {
-      const res = await fetch("http://localhost:5000/api/auth/update-plan", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          plan: plan.name,
-          storage: plan.storage,
-        }),
-      });
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
 
-      const data = await res.json();
+  const upgradeUserPlan = async (plan) => {
+    const res = await fetch("http://localhost:5000/api/auth/update-plan", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        plan: plan.name,
+        storage: plan.storage,
+      }),
+    });
 
-      // ✅ USE BACKEND RESPONSE
-      setUser(data.user);
-      localStorage.setItem("user", JSON.stringify(data.user));
+    const data = await res.json();
 
-      setStorage((prev) => ({
-        ...prev,
-        total: plan.storage,
-      }));
+    // ✅ USE BACKEND RESPONSE
+    setUser(data.user);
+    localStorage.setItem("user", JSON.stringify(data.user));
 
-      setIsPlanModalOpen(false);
-    };
+    setStorage((prev) => ({
+      ...prev,
+      total: plan.storage,
+    }));
 
-    // Share Files Logic
-    const handleShare = async (file) => {
+    setIsPlanModalOpen(false);
+  };
+
+  // Share Files Logic
+  const handleShare = async (file) => {
     setSelectedFile(file);
     setIsShareModalOpen(true);
 
@@ -532,7 +594,7 @@ const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yes
 
       const originalFileKey = await decryptFileKey(
         file.encryptedFileKey,
-        vaultKey
+        vaultKey,
       );
 
       // 🔓 PUBLIC LINK (NO PASSWORD)
@@ -552,7 +614,6 @@ const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yes
 
       const data = await res.json();
       setShareLink(data.link);
-
     } catch (err) {
       console.error(err);
     } finally {
@@ -560,7 +621,7 @@ const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yes
     }
   };
 
-    const createShareLink = async () => {
+  const createShareLink = async () => {
     try {
       if (!sharePassword) {
         alert("Enter password");
@@ -572,12 +633,12 @@ const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yes
       // ✅ FIXED
       const originalFileKey = await decryptFileKey(
         selectedFile.encryptedFileKey,
-        vaultKey
+        vaultKey,
       );
 
       const sharedEncryptedKey = await encryptFileKey(
         originalFileKey,
-        sharePassword
+        sharePassword,
       );
 
       const res = await fetch("http://localhost:5000/api/share/create", {
@@ -596,7 +657,6 @@ const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yes
 
       const data = await res.json();
       setShareLink(data.link);
-
     } catch (err) {
       console.error("Share failed", err);
     }
@@ -615,12 +675,12 @@ const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yes
 
       const originalFileKey = await decryptFileKey(
         selectedFile.encryptedFileKey,
-        vaultKey
+        vaultKey,
       );
 
       const sharedEncryptedKey = await encryptFileKey(
         originalFileKey,
-        sharePassword
+        sharePassword,
       );
 
       const res = await fetch("http://localhost:5000/api/share/create", {
@@ -639,7 +699,6 @@ const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yes
 
       const data = await res.json();
       setShareLink(data.link);
-
     } catch (err) {
       console.error(err);
     } finally {
@@ -650,357 +709,390 @@ const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yes
   //  Preview Modal
   // Inside Dashboard.jsx -> handlePreview function
 
-const handlePreview = async (file) => {
-  try {
-    const password = sessionStorage.getItem("vaultKey");
-    const fileKey = await decryptFileKey(file.encryptedFileKey, password);
-    const key = await importFileKey(fileKey);
+  const handlePreview = async (file) => {
+    try {
+      const password = sessionStorage.getItem("vaultKey");
+      const fileKey = await decryptFileKey(file.encryptedFileKey, password);
+      const key = await importFileKey(fileKey);
 
-    const res = await fetch("http://localhost:5000/api/files/download", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify({ path: file.filePath }),
-    });
+      const res = await fetch("http://localhost:5000/api/files/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ path: file.filePath }),
+      });
 
-    const data = await res.json();
-    const encryptedRes = await fetch(data.url);
-    const encryptedText = await encryptedRes.text(); 
+      const data = await res.json();
+      const encryptedRes = await fetch(data.url);
+      const encryptedText = await encryptedRes.text();
 
-    // Decrypt content
-    const decryptedData = await decryptFileChunks(encryptedText, key);
-    
-    // --- FORCE EXTENSION DETECTION ---
-    // We ignore the 'application/json' type because that's just the envelope.
-    const rawName = (file.originalName || file.filename || "").toLowerCase();
-    const cleanName = rawName.replace(".enc", "");
+      // Decrypt content
+      const decryptedData = await decryptFileChunks(encryptedText, key);
 
-    let detectedMime = "";
+      // --- FORCE EXTENSION DETECTION ---
+      // We ignore the 'application/json' type because that's just the envelope.
+      const rawName = (file.originalName || file.filename || "").toLowerCase();
+      const cleanName = rawName.replace(".enc", "");
 
-    if (cleanName.endsWith(".mp4")) detectedMime = "video/mp4";
-    else if (cleanName.endsWith(".webm")) detectedMime = "video/webm";
-    else if (cleanName.endsWith(".pdf")) detectedMime = "application/pdf";
-    else if (cleanName.endsWith(".png")) detectedMime = "image/png";
-    else if (cleanName.endsWith(".jpg") || cleanName.endsWith(".jpeg")) detectedMime = "image/jpeg";
-    else detectedMime = file.mimeType || "application/octet-stream";
+      let detectedMime = "";
 
-    // Create the Blob with our NEW detected MIME type
-    const typedBlob = new Blob([decryptedData], { type: detectedMime });
-    const url = URL.createObjectURL(typedBlob);
+      if (cleanName.endsWith(".mp4")) detectedMime = "video/mp4";
+      else if (cleanName.endsWith(".webm")) detectedMime = "video/webm";
+      else if (cleanName.endsWith(".pdf")) detectedMime = "application/pdf";
+      else if (cleanName.endsWith(".png")) detectedMime = "image/png";
+      else if (cleanName.endsWith(".jpg") || cleanName.endsWith(".jpeg"))
+        detectedMime = "image/jpeg";
+      else detectedMime = file.mimeType || "application/octet-stream";
 
-    // Update state with the CORRECTED mimeType
-    setPreviewFile({ ...file, mimeType: detectedMime });
-    setPreviewUrl(url);
-    setIsPreviewOpen(true);
+      // Create the Blob with our NEW detected MIME type
+      const typedBlob = new Blob([decryptedData], { type: detectedMime });
+      const url = URL.createObjectURL(typedBlob);
 
-  } catch (err) {
-    console.error("Preview failed:", err);
-  }
-};
+      // Update state with the CORRECTED mimeType
+      setPreviewFile({ ...file, mimeType: detectedMime });
+      setPreviewUrl(url);
+      setIsPreviewOpen(true);
+    } catch (err) {
+      console.error("Preview failed:", err);
+    }
+  };
 
-const markNotificationsAsRead = async () => {
-  if (notifications.length === 0) return;
-  try {
-    await fetch("http://localhost:5000/api/notifications/read", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-    // Update local state so the red dot disappears immediately
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-  } catch (err) {
-    console.error("Mark as read failed", err);
-  }
-};
-const handleTerminalUploadSuccess = (fileName) => {
-  if (terminalRef) {
-    terminalRef.addToHistory(`File uploaded: ${fileName} ✅`, "success");
-  }
-};
+  const markNotificationsAsRead = async () => {
+    if (notifications.length === 0) return;
+    try {
+      await fetch("http://localhost:5000/api/notifications/read", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      // Update local state so the red dot disappears immediately
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch (err) {
+      console.error("Mark as read failed", err);
+    }
+  };
+  const handleTerminalUploadSuccess = (fileName) => {
+    if (terminalRef) {
+      terminalRef.addToHistory(`File uploaded: ${fileName} ✅`, "success");
+    }
+  };
 
-    return (
-      <div className="flex h-screen bg-[#05070a] text-white font-sans overflow-hidden">
-        {/* --- MODALS & OVERLAYS --- */}
-        <AnimatePresence>
-          {isClosing && <VaultLoader mode="locking" />}
-        </AnimatePresence>
+  return (
+    <div className="flex h-screen bg-[#05070a] text-white font-sans overflow-hidden">
+      {/* --- MODALS & OVERLAYS --- */}
+      <AnimatePresence>
+        {isClosing && <VaultLoader mode="locking" />}
+      </AnimatePresence>
 
-        <CypherVaultUpload
-          isOpen={isUploadModalOpen}
-          onClose={() => setIsUploadModalOpen(false)}
-          storage={storage}
-          onUploadSuccess={(fileName) => {
-    fetchFiles();
-    handleTerminalUploadSuccess(fileName);
-  }}
-        />
+      <CypherVaultUpload
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        storage={storage}
+        folderId={currentFolder}
+        onUploadSuccess={(fileName) => {
+          fetchFiles();
+          handleTerminalUploadSuccess(fileName);
+        }}
+      />
 
-        <AnimatePresence>
-          {isSidebarOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSidebarOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-            />
-          )}
-        </AnimatePresence>
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          />
+        )}
+      </AnimatePresence>
 
-        {/* --- SIDEBAR --- */}
-        <aside
-          className={`
+      {/* --- SIDEBAR --- */}
+      <aside
+        className={`
           fixed inset-y-0 left-0 z-50 w-72 bg-[#0a0c10] border-r border-white/5 p-6 transform transition-transform duration-300 lg:relative lg:translate-x-0
           ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
-        >
-          <div className="flex items-center justify-between mb-10 px-2">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-600 p-2 rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)]">
-                <Shield size={22} />
-              </div>
-              <span className="text-xl font-bold tracking-tight italic">
-                CypherVault
-              </span>
+      >
+        <div className="flex items-center justify-between mb-10 px-2">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)]">
+              <Shield size={22} />
             </div>
+            <span className="text-xl font-bold tracking-tight italic">
+              CypherVault
+            </span>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-gray-500"
+          >
+            <X />
+          </button>
+        </div>
+
+        <nav className="space-y-2 flex-1">
+          {menuItems.map((item) => (
             <button
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden text-gray-500"
+              key={item.name}
+              onClick={() => {
+                setActiveTab(item.name);
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
+                activeTab === item.name
+                  ? "bg-blue-600/10 border border-blue-500/30 text-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.1)]"
+                  : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
+              }`}
             >
-              <X />
+              {item.icon} <span className="font-medium">{item.name}</span>
             </button>
+          ))}
+        </nav>
+
+        <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 mb-6">
+          <h4 className="text-sm font-semibold mb-3">Vault Capacity</h4>
+
+          <div className="h-1.5 w-full bg-white/10 rounded-full mb-2 overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${storagePercentage}%` }}
+              className={`h-full ${
+                storagePercentage > 90
+                  ? "bg-red-500"
+                  : storagePercentage > 75
+                    ? "bg-yellow-400"
+                    : "bg-blue-600"
+              }`}
+            />
           </div>
 
-          <nav className="space-y-2 flex-1">
-            {menuItems.map((item) => (
-              <button
-                key={item.name}
-                onClick={() => {
-                  setActiveTab(item.name);
-                  setSidebarOpen(false);
-                }}
-                className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
-                  activeTab === item.name
-                    ? "bg-blue-600/10 border border-blue-500/30 text-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.1)]"
-                    : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
-                }`}
-              >
-                {item.icon} <span className="font-medium">{item.name}</span>
-              </button>
-            ))}
-          </nav>
-
-          <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 mb-6">
-            <h4 className="text-sm font-semibold mb-3">Vault Capacity</h4>
-
-            <div className="h-1.5 w-full bg-white/10 rounded-full mb-2 overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${storagePercentage}%` }}
-                className={`h-full ${
-                  storagePercentage > 90
-                    ? "bg-red-500"
-                    : storagePercentage > 75
-                      ? "bg-yellow-400"
-                      : "bg-blue-600"
-                }`}
-              />
-            </div>
-
-            <div className="flex justify-between text-[10px] text-gray-500 mb-2 font-mono">
-              <span>
-                {storage.used}MB / {storage.total}MB
-              </span>
-            </div>
-
-            {/* 🚨 WARNING */}
-            {storagePercentage > 80 && (
-              <div className="text-xs text-yellow-400 mb-3">
-                ⚠️ Storage almost full. Upgrade recommended.
-              </div>
-            )}
-
-            {storagePercentage >= 100 && (
-              <div className="text-xs text-red-500 mb-3">
-                🚫 Storage full. Upload blocked.
-              </div>
-            )}
-
-            <button
-              onClick={() => setIsPlanModalOpen(true)}
-              className="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-bold"
-            >
-              Upgrade Plan
-            </button>
+          <div className="flex justify-between text-[10px] text-gray-500 mb-2 font-mono">
+            <span>
+              {storage.used}MB / {storage.total}MB
+            </span>
           </div>
+
+          {/* 🚨 WARNING */}
+          {storagePercentage > 80 && (
+            <div className="text-xs text-yellow-400 mb-3">
+              ⚠️ Storage almost full. Upgrade recommended.
+            </div>
+          )}
+
+          {storagePercentage >= 100 && (
+            <div className="text-xs text-red-500 mb-3">
+              🚫 Storage full. Upload blocked.
+            </div>
+          )}
 
           <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/10 text-gray-500 hover:text-red-500 transition-all"
+            onClick={() => setIsPlanModalOpen(true)}
+            className="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-bold"
           >
-            <LogOut size={18} />{" "}
-            <span className="text-sm font-bold">Logout Session</span>
+            Upgrade Plan
           </button>
-        </aside>
+        </div>
 
-        {/* --- MAIN CONTENT --- */}
-        <main className="flex-1 flex flex-col min-w-0">
-          <header className="h-20 border-b border-white/5 flex items-center justify-between px-4 lg:px-10 bg-[#05070a]/80 backdrop-blur-xl z-10 relative">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 text-gray-400 hover:text-white"
-              >
-                <Menu size={24} />
-              </button>
-              <div className="relative hidden lg:block w-96">
-                <Search
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
-                  size={18}
-                />
-                <input
-                  type="text"
-                  placeholder="Search Files..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl py-2.5 pl-12 pr-4 outline-none focus:border-blue-500/50 text-sm"
-                />
-              </div>
-            </div>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/10 text-gray-500 hover:text-red-500 transition-all"
+        >
+          <LogOut size={18} />{" "}
+          <span className="text-sm font-bold">Logout Session</span>
+        </button>
+      </aside>
 
-            <div className="absolute left-1/2 -translate-x-1/2 lg:hidden w-full max-w-[180px] sm:max-w-[300px] flex justify-center">
-              <motion.div
-                variants={searchVariants}
-                animate={isSearchOpen ? "open" : "closed"}
-                className="relative flex items-center rounded-full border border-white/10 px-3 py-1.5"
-              >
-                <Search
-                  size={18}
-                  className="text-gray-400 cursor-pointer shrink-0"
-                  onClick={() => setIsSearchOpen(!isSearchOpen)}
-                />
-                <AnimatePresence>
-                  {isSearchOpen && (
-                    <motion.input
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: "auto" }}
-                      exit={{ opacity: 0, width: 0 }}
-                      autoFocus
-                      placeholder="Search..."
-                      className="bg-transparent outline-none text-xs ml-2 w-full"
-                    />
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-6">
-              <button
-  onClick={() => setShowTerminal(true)}
-  className="bg-emerald-600 hover:bg-emerald-500 text-xs px-3 py-1 rounded-lg font-bold"
->
-  Console
-</button>
-              <button
-    onClick={(e) => {
-      e.stopPropagation();
-      setIsNotifOpen(!isNotifOpen);
-      markNotificationsAsRead();
-    }}
-    className="relative text-gray-500 hover:text-white p-2"
-  >
-    <Bell size={22} />
-    
-    {unreadCount > 0 && (
-  <span className="absolute top-2 right-2 text-[10px] bg-red-500 px-1 rounded-full">
-    {unreadCount}
-  </span>
-)}
-  </button>
-
-              <button
-                onClick={() => setProfileOpen(true)}
-                className="flex items-center gap-3 pl-4 border-l border-white/10 hover:opacity-80 transition-opacity"
-              >
-                <div className="hidden sm:block text-right">
-                  <p className="text-sm font-bold truncate max-w-[100px]">
-                    {user.name}
-                  </p>
-                  <p className="text-[10px] text-blue-500 uppercase tracking-widest font-black">
-                    {user.plan}
-                  </p>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-white/20 flex items-center justify-center">
-                  <User size={20} />
-                </div>
-              </button>
-            </div>
-          </header>
-          {isNotifOpen && (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="absolute right-10 top-16 w-80 bg-[#0a0c10] border border-white/10 rounded-2xl p-4 z-50 shadow-xl"
-    >
-      <h3 className="text-sm font-bold mb-3">Notifications</h3>
-
-      {notifications.length === 0 ? (
-        <p className="text-gray-500 text-sm">No notifications</p>
-      ) : (
-        notifications.map((n) => (
-          <div
-            key={n._id}
-            className="p-2 mb-2 bg-white/5 rounded-lg text-xs"
-          >
-            {n.message}
-          </div>
-        ))
-      )}
-    </div>
-  )}
-
-          <div className="p-6 lg:p-10 overflow-y-auto flex-1 custom-scrollbar">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-8 text-center sm:text-left"
+      {/* --- MAIN CONTENT --- */}
+      <main className="flex-1 flex flex-col min-w-0">
+        <header className="h-20 border-b border-white/5 flex items-center justify-between px-4 lg:px-10 bg-[#05070a]/80 backdrop-blur-xl z-10 relative">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 text-gray-400 hover:text-white"
             >
-              <h2 className="text-2xl lg:text-3xl font-bold italic tracking-tight uppercase">
-                Welcome, {user.name.split(" ")[0]}
-              </h2>
-              <p className="text-gray-500 text-sm mt-1">
-                Status:{" "}
-                <span className="text-blue-500">
-                  Your vault is encrypted and secure
-                </span>
-              </p>
-            </motion.div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-              {["Project Titan", "Financials 2026", "Reports", "Signatures"].map(
-                (folder, i) => (
-                  <motion.div
-                    key={folder}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    
-                    className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex items-center gap-4 hover:bg-white/[0.05] hover:border-blue-500/30 transition-all cursor-pointer group"
-                  >
-                    <Folder
-                      className="text-gray-600 group-hover:text-blue-500"
-                      size={20}
-                    />
-                    <span className="text-sm font-medium">{folder}</span>
-                  </motion.div>
-                ),
-              )}
+              <Menu size={24} />
+            </button>
+            <div className="relative hidden lg:block w-96">
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="Search Files..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-white/[0.03] border border-white/10 rounded-xl py-2.5 pl-12 pr-4 outline-none focus:border-blue-500/50 text-sm"
+              />
             </div>
+          </div>
 
-            <div className="flex flex-col gap-6 pb-24">
-              {/* 🛠️ SORT & FILTER BAR */}
+          <div className="absolute left-1/2 -translate-x-1/2 lg:hidden w-full max-w-[180px] sm:max-w-[300px] flex justify-center">
+            <motion.div
+              variants={searchVariants}
+              animate={isSearchOpen ? "open" : "closed"}
+              className="relative flex items-center rounded-full border border-white/10 px-3 py-1.5"
+            >
+              <Search
+                size={18}
+                className="text-gray-400 cursor-pointer shrink-0"
+                onClick={() => setIsSearchOpen(!isSearchOpen)}
+              />
+              <AnimatePresence>
+                {isSearchOpen && (
+                  <motion.input
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: "auto" }}
+                    exit={{ opacity: 0, width: 0 }}
+                    autoFocus
+                    placeholder="Search..."
+                    className="bg-transparent outline-none text-xs ml-2 w-full"
+                  />
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-6">
+            {/* 📂 CREATE FOLDER BUTTON */}
+            <button
+              onClick={() => setIsCreatingFolder(true)}
+              className="bg-blue-600 hover:bg-blue-500 text-xs px-3 py-1 rounded-lg font-bold flex items-center gap-2"
+            >
+              <Plus size={14} /> Folder
+            </button>
+            <button
+              onClick={() => setShowTerminal(true)}
+              className="bg-emerald-600 hover:bg-emerald-500 text-xs px-3 py-1 rounded-lg font-bold"
+            >
+              Console
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsNotifOpen(!isNotifOpen);
+                markNotificationsAsRead();
+              }}
+              className="relative text-gray-500 hover:text-white p-2"
+            >
+              <Bell size={22} />
+
+              {unreadCount > 0 && (
+                <span className="absolute top-2 right-2 text-[10px] bg-red-500 px-1 rounded-full">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setProfileOpen(true)}
+              className="flex items-center gap-3 pl-4 border-l border-white/10 hover:opacity-80 transition-opacity"
+            >
+              <div className="hidden sm:block text-right">
+                <p className="text-sm font-bold truncate max-w-[100px]">
+                  {user.name}
+                </p>
+                <p className="text-[10px] text-blue-500 uppercase tracking-widest font-black">
+                  {user.plan}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-white/20 flex items-center justify-center">
+                <User size={20} />
+              </div>
+            </button>
+          </div>
+        </header>
+        {isNotifOpen && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute right-10 top-16 w-80 bg-[#0a0c10] border border-white/10 rounded-2xl p-4 z-50 shadow-xl"
+          >
+            <h3 className="text-sm font-bold mb-3">Notifications</h3>
+
+            {notifications.length === 0 ? (
+              <p className="text-gray-500 text-sm">No notifications</p>
+            ) : (
+              notifications.map((n) => (
+                <div
+                  key={n._id}
+                  className="p-2 mb-2 bg-white/5 rounded-lg text-xs"
+                >
+                  {n.message}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        <div className="p-6 lg:p-10 overflow-y-auto flex-1 custom-scrollbar">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 text-center sm:text-left"
+          >
+            <h2 className="text-2xl lg:text-3xl font-bold italic tracking-tight uppercase">
+              Welcome, {user.name.split(" ")[0]}
+            </h2>
+            <p className="text-gray-500 text-sm mt-1">
+              Status:{" "}
+              <span className="text-blue-500">
+                Your vault is encrypted and secure
+              </span>
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+            {/* BACK BUTTON: Shows when inside a folder */}
+            {currentFolder && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                onClick={() => setCurrentFolder(null)}
+                className="bg-white/5 border border-dashed border-white/20 p-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white/10 transition-all"
+              >
+                <div className="bg-blue-600/20 p-2 rounded-lg text-blue-400">
+                  <Menu size={18} />
+                </div>
+                <span className="text-sm font-bold">... / Back</span>
+              </motion.div>
+            )}
+
+            {/* DYNAMIC FOLDERS FROM DATABASE */}
+            {folders.map((folder, i) => (
+              <motion.div
+                key={folder._id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                onClick={() => setCurrentFolder(folder._id)}
+                className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex items-center gap-4 hover:bg-white/[0.05] hover:border-blue-500/30 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center gap-4 truncate">
+                  <Folder
+                    className="text-gray-600 group-hover:text-blue-500"
+                    size={20}
+                  />
+                  <span className="text-sm font-medium">{folder.name}</span>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevents entering the folder when clicking delete
+                    handleDeleteFolder(folder._id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-500/10 text-gray-500 hover:text-red-500 rounded-lg transition-all"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-6 pb-24">
+            {/* 🛠️ SORT & FILTER BAR */}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4 px-2">
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                 {["all", "today", "yesterday", "week"].map((period) => (
@@ -1019,7 +1111,9 @@ const handleTerminalUploadSuccess = (fileName) => {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-gray-600 uppercase tracking-tighter">Sort By:</span>
+                <span className="text-[10px] font-black text-gray-600 uppercase tracking-tighter">
+                  Sort By:
+                </span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
@@ -1033,544 +1127,592 @@ const handleTerminalUploadSuccess = (fileName) => {
                 </select>
               </div>
             </div>
-              {/* 🏷️ DYNAMIC HEADING: Shows up when you're in the Favorites tab */}
-              <AnimatePresence mode="wait">
-                {activeTab === "Favorites" && filteredFiles.length > 0 && (
+            {/* 🏷️ DYNAMIC HEADING: Shows up when you're in the Favorites tab */}
+            <AnimatePresence mode="wait">
+              {activeTab === "Favorites" && filteredFiles.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="flex items-center gap-3 px-2"
+                >
+                  <div className="h-8 w-1 bg-yellow-500 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
+                  <h2 className="text-xl font-bold tracking-widest uppercase italic text-white/90">
+                    Secure Favorites
+                  </h2>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* 🗂️ FILES GRID */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <AnimatePresence mode="popLayout">
+                {filteredFiles.length === 0 ? (
                   <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="flex items-center gap-3 px-2"
+                    key="empty-state"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="col-span-full py-20 text-center border-2 border-dashed border-white/5 rounded-[32px] bg-white/[0.01]"
                   >
-                    <div className="h-8 w-1 bg-yellow-500 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
-                    <h2 className="text-xl font-bold tracking-widest uppercase italic text-white/90">
-                      Secure Favorites
-                    </h2>
+                    <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Search className="text-gray-600" size={24} />
+                    </div>
+                    <p className="text-gray-500 font-medium">
+                      No items found in {activeTab}
+                    </p>
+                    <p className="text-gray-700 text-xs mt-1">
+                      Your encrypted vault is empty here.
+                    </p>
                   </motion.div>
+                ) : (
+                  filteredFiles.map((file) => (
+                    <FileCard
+                      key={file._id}
+                      file={file}
+                      name={file.displayName}
+                      onPreview={handlePreview}
+                      date={
+                        file.uploadedAt
+                          ? new Date(file.uploadedAt).toLocaleDateString(
+                              "en-IN",
+                            )
+                          : "N/A"
+                      }
+                      activeMenu={activeMenu}
+                      setActiveMenu={setActiveMenu}
+                      handleDownload={handleDownload}
+                      handleDelete={handleDelete}
+                      toggleFavorite={toggleFavorite}
+                      handleRestore={handleRestore}
+                      handlePermanentDelete={handlePermanentDelete}
+                      isFavorite={file.isFavorite}
+                      handleShare={handleShare}
+                    />
+                  ))
                 )}
               </AnimatePresence>
-
-              {/* 🗂️ FILES GRID */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <AnimatePresence mode="popLayout">
-                  {filteredFiles.length === 0 ? (
-                    <motion.div
-                      key="empty-state"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="col-span-full py-20 text-center border-2 border-dashed border-white/5 rounded-[32px] bg-white/[0.01]"
-                    >
-                      <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Search className="text-gray-600" size={24} />
-                      </div>
-                      <p className="text-gray-500 font-medium">
-                        No items found in {activeTab}
-                      </p>
-                      <p className="text-gray-700 text-xs mt-1">
-                        Your encrypted vault is empty here.
-                      </p>
-                    </motion.div>
-                  ) : (
-                    filteredFiles.map((file) => (
-                      <FileCard
-                        key={file._id}
-                        file={file}
-                        name={file.displayName}
-                        onPreview={handlePreview} 
-                        date={
-                          file.uploadedAt
-                            ? new Date(file.uploadedAt).toLocaleDateString(
-                                "en-IN",
-                              )
-                            : "N/A"
-                        }
-                        activeMenu={activeMenu}
-                        setActiveMenu={setActiveMenu}
-                        handleDownload={handleDownload}
-                        handleDelete={handleDelete}
-                        toggleFavorite={toggleFavorite}
-                        handleRestore={handleRestore}
-                        handlePermanentDelete={handlePermanentDelete}
-                        isFavorite={file.isFavorite}
-                        handleShare={handleShare}
-                      />
-                    ))
-                  )}
-                </AnimatePresence>
-              </div>
             </div>
           </div>
-        </main>
+        </div>
+      </main>
 
-        {/* --- PROFILE DRAWER --- */}
-        <AnimatePresence>
-          {isProfileOpen && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setProfileOpen(false)}
-                className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60]"
-              />
-              <motion.div
-                initial={{ x: "100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed right-0 top-0 h-full w-full sm:w-[400px] bg-[#0a0c10] border-l border-white/10 z-[70] p-8"
-              >
-                <div className="flex justify-between items-center mb-10">
-                  <h3 className="text-lg font-bold tracking-widest text-gray-500 uppercase">
-                    Account Settings
-                  </h3>
-                  <button
-                    onClick={() => setProfileOpen(false)}
-                    className="p-2 hover:bg-white/5 rounded-full"
-                  >
-                    <X />
+      {/* --- PROFILE DRAWER --- */}
+      <AnimatePresence>
+        {isProfileOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setProfileOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60]"
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 h-full w-full sm:w-[400px] bg-[#0a0c10] border-l border-white/10 z-[70] p-8"
+            >
+              <div className="flex justify-between items-center mb-10">
+                <h3 className="text-lg font-bold tracking-widest text-gray-500 uppercase">
+                  Account Settings
+                </h3>
+                <button
+                  onClick={() => setProfileOpen(false)}
+                  className="p-2 hover:bg-white/5 rounded-full"
+                >
+                  <X />
+                </button>
+              </div>
+
+              <div className="flex flex-col items-center text-center mb-10">
+                <div className="w-24 h-24 rounded-3xl bg-blue-600 mb-6 flex items-center justify-center shadow-[0_0_40px_rgba(37,99,235,0.3)] border border-white/20">
+                  <User size={40} />
+                </div>
+                {isEditingName ? (
+                  <div className="flex items-center gap-2 bg-white/5 p-2 rounded-xl border border-blue-500/30">
+                    <input
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="bg-transparent outline-none text-lg text-center w-full"
+                    />
+                    <button
+                      onClick={handleUpdateName}
+                      className="p-1 bg-green-500 rounded-md text-black"
+                    >
+                      <Check size={18} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-2xl font-bold">{user.name}</h2>
+                    <button
+                      onClick={() => setIsEditingName(true)}
+                      className="text-gray-500 hover:text-blue-500 transition-colors"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  </div>
+                )}
+                <p className="text-gray-500 text-sm mt-1">{user.email}</p>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-gradient-to-br from-blue-600/20 to-indigo-900/10 border border-white/10">
+                <span className="text-[10px] font-black text-blue-400 uppercase tracking-tighter">
+                  Account Status
+                </span>
+                <p className="text-xl font-bold mt-1">{user.plan} Plan</p>
+                {user.plan !== "Starter" && user.planExpiry && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Expires on{" "}
+                    <span className="text-yellow-400">
+                      {new Date(user.planExpiry).toLocaleDateString()}
+                    </span>
+                  </p>
+                )}
+                <div className="mt-6 flex flex-col gap-3">
+                  <button className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-600/20 transition-all">
+                    Upgrade to Enterprise
+                  </button>
+                  <button className="w-full py-3 border border-white/10 hover:bg-white/5 rounded-xl text-sm text-gray-400">
+                    View Billing History
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
-                <div className="flex flex-col items-center text-center mb-10">
-                  <div className="w-24 h-24 rounded-3xl bg-blue-600 mb-6 flex items-center justify-center shadow-[0_0_40px_rgba(37,99,235,0.3)] border border-white/20">
-                    <User size={40} />
-                  </div>
-                  {isEditingName ? (
-                    <div className="flex items-center gap-2 bg-white/5 p-2 rounded-xl border border-blue-500/30">
-                      <input
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        className="bg-transparent outline-none text-lg text-center w-full"
-                      />
-                      <button
-                        onClick={handleUpdateName}
-                        className="p-1 bg-green-500 rounded-md text-black"
-                      >
-                        <Check size={18} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-2xl font-bold">{user.name}</h2>
-                      <button
-                        onClick={() => setIsEditingName(true)}
-                        className="text-gray-500 hover:text-blue-500 transition-colors"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    </div>
-                  )}
-                  <p className="text-gray-500 text-sm mt-1">{user.email}</p>
-                </div>
-
-                <div className="p-6 rounded-3xl bg-gradient-to-br from-blue-600/20 to-indigo-900/10 border border-white/10">
-                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-tighter">
-                    Account Status
-                  </span>
-                  <p className="text-xl font-bold mt-1">{user.plan} Plan</p>
-                  {user.plan !== "Starter" && user.planExpiry && (
-                    <p className="text-xs text-gray-400 mt-2">
-                      Expires on{" "}
-                      <span className="text-yellow-400">
-                        {new Date(user.planExpiry).toLocaleDateString()}
-                      </span>
-                    </p>
-                  )}
-                  <div className="mt-6 flex flex-col gap-3">
-                    <button className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-600/20 transition-all">
-                      Upgrade to Enterprise
-                    </button>
-                    <button className="w-full py-3 border border-white/10 hover:bg-white/5 rounded-xl text-sm text-gray-400">
-                      View Billing History
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-
-        {/* --- UPLOAD BUTTON: Linked to Modal --- */}
-        <motion.button
-          whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(37,99,235,0.5)" }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setIsUploadModalOpen(true)} // ✅ Opens the Modal
-          className="fixed bottom-8 right-6 lg:bottom-10 lg:right-10 z-50 
+      {/* --- UPLOAD BUTTON: Linked to Modal --- */}
+      <motion.button
+        whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(37,99,235,0.5)" }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setIsUploadModalOpen(true)} // ✅ Opens the Modal
+        className="fixed bottom-8 right-6 lg:bottom-10 lg:right-10 z-50 
                     bg-gradient-to-tr from-blue-600 to-blue-400 
                     text-white px-6 py-4 rounded-[22px] shadow-2xl
                     flex items-center gap-3"
-        >
-          <Plus size={24} className="bg-white/20 rounded-lg p-1" />
-          <span className="font-bold tracking-tight hidden sm:block">
-            UPLOAD SECURELY
-          </span>
-        </motion.button>
-        {isPlanModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-[#0a0c10] p-8 rounded-3xl w-[700px] border border-white/10"
+      >
+        <Plus size={24} className="bg-white/20 rounded-lg p-1" />
+        <span className="font-bold tracking-tight hidden sm:block">
+          UPLOAD SECURELY
+        </span>
+      </motion.button>
+      {isPlanModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#0a0c10] p-8 rounded-3xl w-[700px] border border-white/10"
+          >
+            <h2 className="text-2xl font-bold mb-8 text-center">
+              Upgrade Your Vault
+            </h2>
+
+            <div className="grid grid-cols-3 gap-4">
+              {plans.map((plan) => {
+                const isCurrent = user.plan === plan.name;
+
+                return (
+                  <div
+                    key={plan.name}
+                    className={`p-5 rounded-2xl border transition-all ${
+                      isCurrent
+                        ? "border-blue-500 bg-blue-600/10 scale-105"
+                        : "border-white/10 hover:border-blue-500/30"
+                    }`}
+                  >
+                    <h3 className="text-lg font-bold">{plan.name}</h3>
+
+                    <p className="text-2xl font-black mt-2">
+                      ₹{plan.price}
+                      <span className="text-xs text-gray-400"> /month</span>
+                    </p>
+
+                    <p className="text-sm text-gray-400 mt-2">
+                      {plan.storage} MB Secure Storage
+                    </p>
+
+                    <ul className="text-xs text-gray-500 mt-4 space-y-1">
+                      <li>✔ End-to-End Encryption</li>
+                      <li>✔ Secure Sharing</li>
+                      <li>✔ Zero Knowledge</li>
+                    </ul>
+
+                    {isCurrent ? (
+                      <button className="mt-5 w-full py-2 bg-gray-600 rounded-lg text-xs">
+                        Current Plan
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handlePayment(plan)}
+                        className="mt-5 w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-bold"
+                      >
+                        Upgrade
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setIsPlanModalOpen(false)}
+              className="mt-6 w-full text-gray-400 text-sm"
             >
-              <h2 className="text-2xl font-bold mb-8 text-center">
-                Upgrade Your Vault
-              </h2>
+              Close
+            </button>
+          </motion.div>
+        </div>
+      )}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-[#0a0c10] p-6 rounded-2xl w-[420px] border border-white/10">
+            <h2 className="text-lg font-bold text-center mb-4">
+              🔗 Share File
+            </h2>
 
-              <div className="grid grid-cols-3 gap-4">
-                {plans.map((plan) => {
-                  const isCurrent = user.plan === plan.name;
+            {/* FILE NAME */}
+            {selectedFile && (
+              <p className="text-xs text-gray-400 text-center mb-2">
+                📄 {selectedFile.filename.replace(".enc", "")}
+              </p>
+            )}
 
-                  return (
-                    <div
-                      key={plan.name}
-                      className={`p-5 rounded-2xl border transition-all ${
-                        isCurrent
-                          ? "border-blue-500 bg-blue-600/10 scale-105"
-                          : "border-white/10 hover:border-blue-500/30"
-                      }`}
-                    >
-                      <h3 className="text-lg font-bold">{plan.name}</h3>
+            {/* LINK BOX */}
+            <input
+              value={shareLink || "Generating link..."}
+              readOnly
+              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-xs text-center mb-3"
+            />
 
-                      <p className="text-2xl font-black mt-2">
-                        ₹{plan.price}
-                        <span className="text-xs text-gray-400"> /month</span>
-                      </p>
-
-                      <p className="text-sm text-gray-400 mt-2">
-                        {plan.storage} MB Secure Storage
-                      </p>
-
-                      <ul className="text-xs text-gray-500 mt-4 space-y-1">
-                        <li>✔ End-to-End Encryption</li>
-                        <li>✔ Secure Sharing</li>
-                        <li>✔ Zero Knowledge</li>
-                      </ul>
-
-                      {isCurrent ? (
-                        <button className="mt-5 w-full py-2 bg-gray-600 rounded-lg text-xs">
-                          Current Plan
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handlePayment(plan)}
-                          className="mt-5 w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-bold"
-                        >
-                          Upgrade
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+            {/* QR */}
+            {shareLink && (
+              <div className="flex justify-center mb-4">
+                <div className="bg-white p-2 rounded">
+                  <QRCode value={shareLink} size={120} />
+                </div>
               </div>
+            )}
+
+            {/* COPY */}
+            {shareLink && (
+              <button
+                onClick={() => navigator.clipboard.writeText(shareLink)}
+                className="w-full py-2 bg-green-600 rounded-lg text-xs font-bold mb-3"
+              >
+                Copy Link
+              </button>
+            )}
+
+            {/* TOGGLE */}
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-gray-400">
+                🔐 Password Protection
+              </span>
 
               <button
-                onClick={() => setIsPlanModalOpen(false)}
-                className="mt-6 w-full text-gray-400 text-sm"
+                onClick={() => setIsPasswordProtected(!isPasswordProtected)}
+                className={`w-10 h-5 rounded-full ${
+                  isPasswordProtected ? "bg-blue-600" : "bg-gray-600"
+                }`}
               >
-                Close
+                <div
+                  className={`h-5 w-5 bg-white rounded-full transform ${
+                    isPasswordProtected ? "translate-x-5" : ""
+                  }`}
+                />
               </button>
+            </div>
+
+            {/* PASSWORD INPUT */}
+            {isPasswordProtected && (
+              <>
+                <input
+                  type="password"
+                  placeholder="Set password"
+                  value={sharePassword}
+                  onChange={(e) => setSharePassword(e.target.value)}
+                  className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-xs mb-2"
+                />
+
+                <button
+                  onClick={createSecureLink}
+                  className="w-full py-2 bg-blue-600 rounded-lg text-xs font-bold"
+                >
+                  Generate Secure Link
+                </button>
+              </>
+            )}
+
+            {/* CLOSE */}
+            <button
+              onClick={() => setIsShareModalOpen(false)}
+              className="mt-4 w-full text-gray-400 text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showTerminal && (
+        <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center">
+          <TerminalMode
+            refCallback={setTerminalRef}
+            userFiles={files}
+            onUpload={() => setIsUploadModalOpen(true)} // reuse your upload modal
+            onDelete={async (filename) => {
+              const file = files.find((f) => f.filename === filename);
+              if (file) await handleDelete(file);
+            }}
+          />
+
+          {/* CLOSE BUTTON */}
+          <button
+            onClick={() => setShowTerminal(false)}
+            className="absolute top-6 right-6 bg-red-500 px-4 py-2 rounded-lg text-white font-bold"
+          >
+            ✕ Close
+          </button>
+        </div>
+      )}
+
+      <FilePreviewModal
+        isOpen={isPreviewOpen}
+        file={previewFile}
+        url={previewUrl}
+        onClose={() => setIsPreviewOpen(false)}
+      />
+
+      {/* 📁 CREATE FOLDER POPUP MODAL */}
+      <AnimatePresence>
+        {isCreatingFolder && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-[#0a0c10] border border-white/10 p-6 rounded-3xl w-full max-w-sm shadow-2xl"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-blue-600/20 rounded-lg text-blue-500">
+                  <Folder size={20} />
+                </div>
+                <h3 className="text-lg font-bold">New Secure Folder</h3>
+              </div>
+
+              <input
+                autoFocus
+                type="text"
+                placeholder="Enter folder name..."
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500/50 mb-6 text-sm"
+              />
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setIsCreatingFolder(false);
+                    setNewFolderName("");
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 font-bold transition-all text-xs"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleCreateFolder}
+                  disabled={!newFolderName.trim()}
+                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all shadow-lg shadow-blue-600/20 text-xs disabled:opacity-50"
+                >
+                  CREATE
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
-        {isShareModalOpen && (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="bg-[#0a0c10] p-6 rounded-2xl w-[420px] border border-white/10">
+      </AnimatePresence>
 
-        <h2 className="text-lg font-bold text-center mb-4">
-          🔗 Share File
-        </h2>
+      <FilePreviewModal
+        isOpen={isPreviewOpen}
+        file={previewFile}
+        url={previewUrl}
+        onClose={() => setIsPreviewOpen(false)}
+      />
+    </div> // This is the final closing div of Dashboard
+  );
+};
 
-        {/* FILE NAME */}
-        {selectedFile && (
-          <p className="text-xs text-gray-400 text-center mb-2">
-            📄 {selectedFile.filename.replace(".enc", "")}
-          </p>
-        )}
+// ... FileCard component remains the same
+const FileCard = ({
+  file,
+  onPreview,
+  name,
+  date,
+  activeMenu,
+  setActiveMenu,
+  handleDownload,
+  handleDelete,
+  toggleFavorite,
+  icon = "file",
+  handleRestore,
+  handleShare,
+  handlePermanentDelete,
+}) => {
+  const isOpen = activeMenu === file?._id;
 
-        {/* LINK BOX */}
-        <input
-          value={shareLink || "Generating link..."}
-          readOnly
-          className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-xs text-center mb-3"
-        />
-
-        {/* QR */}
-        {shareLink && (
-          <div className="flex justify-center mb-4">
-            <div className="bg-white p-2 rounded">
-              <QRCode value={shareLink} size={120} />
-            </div>
-          </div>
-        )}
-
-        {/* COPY */}
-        {shareLink && (
-          <button
-            onClick={() => navigator.clipboard.writeText(shareLink)}
-            className="w-full py-2 bg-green-600 rounded-lg text-xs font-bold mb-3"
-          >
-            Copy Link
-          </button>
-        )}
-
-        {/* TOGGLE */}
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs text-gray-400">
-            🔐 Password Protection
-          </span>
-
-          <button
-            onClick={() => setIsPasswordProtected(!isPasswordProtected)}
-            className={`w-10 h-5 rounded-full ${
-              isPasswordProtected ? "bg-blue-600" : "bg-gray-600"
-            }`}
-          >
-            <div
-              className={`h-5 w-5 bg-white rounded-full transform ${
-                isPasswordProtected ? "translate-x-5" : ""
-              }`}
-            />
-          </button>
-        </div>
-
-        {/* PASSWORD INPUT */}
-        {isPasswordProtected && (
-          <>
-            <input
-              type="password"
-              placeholder="Set password"
-              value={sharePassword}
-              onChange={(e) => setSharePassword(e.target.value)}
-              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-xs mb-2"
-            />
-
-            <button
-              onClick={createSecureLink}
-              className="w-full py-2 bg-blue-600 rounded-lg text-xs font-bold"
-            >
-              Generate Secure Link
-            </button>
-          </>
-        )}
-
-        {/* CLOSE */}
-        <button
-          onClick={() => setIsShareModalOpen(false)}
-          className="mt-4 w-full text-gray-400 text-sm"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  )}
-
-{showTerminal && (
-  <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center">
-
-    <TerminalMode
-      refCallback={setTerminalRef}
-      userFiles={files}
-      onUpload={() => setIsUploadModalOpen(true)} // reuse your upload modal
-      onDelete={async (filename) => {
-        const file = files.find(f => f.filename === filename);
-        if (file) await handleDelete(file);
-      }}
-    />
-
-    {/* CLOSE BUTTON */}
-    <button
-      onClick={() => setShowTerminal(false)}
-      className="absolute top-6 right-6 bg-red-500 px-4 py-2 rounded-lg text-white font-bold"
-    >
-      ✕ Close
-    </button>
-
-  </div>
-)}
-
-  <FilePreviewModal
-    isOpen={isPreviewOpen}
-    file={previewFile}
-    url={previewUrl}
-    onClose={() => setIsPreviewOpen(false)}
-  />
-      </div>
-    );
+  // Helper to run action and close menu instantly
+  const runAction = (actionFn) => {
+    actionFn();
+    setActiveMenu(null);
   };
 
-  // ... FileCard component remains the same
-  const FileCard = ({
-    file,
-    onPreview,
-    name,
-    date,
-    activeMenu,
-    setActiveMenu,
-    handleDownload,
-    handleDelete,
-    toggleFavorite,
-    icon = "file",
-    handleRestore,
-    handleShare,
-    handlePermanentDelete,
-  }) => {
-    const isOpen = activeMenu === file?._id;
-
-    // Helper to run action and close menu instantly
-    const runAction = (actionFn) => {
-      actionFn();
-      setActiveMenu(null);
-    };
-
-    return (
-      <motion.div
-        layout
-        onClick={() => {
-          
-    console.log("CLICKED FILE:", file);
-    onPreview(file);
-  }}
-          
-        className={`group relative p-4 lg:p-6 rounded-[24px] border cursor-pointer transition-all duration-300 ${
-          isOpen
-            ? "bg-blue-600/10 border-blue-500/40 shadow-xl z-[200]"
-            : "bg-white/[0.02] border-white/5 z-0"
-        }`}
-      >
-        <div className="flex items-center justify-between gap-4">
-          {/* Info Section */}
-          <div className="flex items-center gap-4 flex-1 min-w-0">
-            <div
-              className={`p-3 rounded-2xl transition-colors duration-300 ${isOpen ? "bg-blue-600 text-white scale-110" : "bg-white/5 text-gray-500"}`}
-            >
-              {icon === "key" ? <Key size={20} /> : <FileText size={20} />}
-            </div>
-            <div className="min-w-0">
-              <h4 className="font-bold text-sm truncate text-white/90">{name}</h4>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5">
-                {date}
-              </p>
-            </div>
-          </div>
-
-          {/* Menu Trigger */}
-          <div className="relative">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setActiveMenu(isOpen ? null : file._id);
-              }}
-              className={`p-2.5 rounded-xl z-[110] relative transition-all ${
-                isOpen
-                  ? "bg-white text-black scale-110 shadow-lg"
-                  : "text-gray-500 hover:text-white"
-              }`}
-            >
-              {isOpen ? <X size={18} /> : <MoreVertical size={18} />}
-            </button>
-
-            {/* 🚀 MICRO CONTEXT MENU (Mobile & Desktop Unified) */}
-            <AnimatePresence>
-              {isOpen && (
-                <>
-                  {/* Transparent Scrim to close on outside tap */}
-                  <div
-                    className="fixed inset-0 z-[100]"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveMenu(null);
-                    }}
-                  />
-
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8, x: 10, y: -10 }}
-                    animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.8, x: 10, y: -10 }}
-                    className="absolute right-0 mt-3 w-48 bg-[#0d0f14]/90 border border-white/10 rounded-[20px] shadow-2xl z-[105] overflow-hidden backdrop-blur-2xl origin-top-right"
-                  >
-                    <div className="p-1.5 flex flex-col gap-1">
-                      <CompactMenuItem
-                        icon={
-                          <Star
-                            size={16}
-                            className={
-                              file.isFavorite
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "text-gray-400"
-                            }
-                          />
-                        }
-                        label={file.isFavorite ? "Unfavorite" : "Favorite"}
-                        onClick={() => runAction(() => toggleFavorite(file._id))}
-                      />
-                      <CompactMenuItem
-                        icon={<Download size={16} className="text-blue-400" />}
-                        
-                        label="Download"
-                        onClick={() => runAction(() => handleDownload(file))}
-                      />
-                      <CompactMenuItem
-                            icon={<Share2 size={16} className="text-green-400" />}
-                            label="Share"
-                            onClick={() => runAction(() => handleShare(file))}
-                          />
-                      <div className="h-px bg-white/5 mx-2 my-1" />
-                      {file.isDeleted ? (
-                        <>
-                          <CompactMenuItem
-                            icon={<Check size={16} className="text-green-400" />}
-                            label="Restore"
-                            onClick={() => runAction(() => handleRestore(file))}
-                          />
-
-                          <CompactMenuItem
-                            icon={<Trash2 size={16} className="text-red-500" />}
-                            label="Delete Forever"
-                            variant="danger"
-                            onClick={() =>
-                              runAction(() => handlePermanentDelete(file))
-                            }
-                          />
-                          
-                        </>
-                      ) : (
-                        <CompactMenuItem
-                          icon={<Trash2 size={16} className="text-red-500" />}
-                          label="Delete"
-                          variant="danger"
-                          onClick={() => runAction(() => handleDelete(file))}
-                        />
-                      )}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
-          
-        </div>
-        
-      </motion.div>
-    );
-  };
-
-  /* Micro Menu Item Component */
-  const CompactMenuItem = ({ icon, label, onClick, variant = "default" }) => (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
+  return (
+    <motion.div
+      layout
+      onClick={() => {
+        console.log("CLICKED FILE:", file);
+        onPreview(file);
       }}
-      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all active:scale-95 ${
-        variant === "danger"
-          ? "hover:bg-red-500/10 text-red-400"
-          : "hover:bg-white/5 text-white/80"
+      className={`group relative p-4 lg:p-6 rounded-[24px] border cursor-pointer transition-all duration-300 ${
+        isOpen
+          ? "bg-blue-600/10 border-blue-500/40 shadow-xl z-[200]"
+          : "bg-white/[0.02] border-white/5 z-0"
       }`}
     >
-      <span className="p-1.5 bg-white/5 rounded-lg">{icon}</span>
-      <span className="text-xs font-bold tracking-tight">{label}</span>
-    </button>
-  );
+      <div className="flex items-center justify-between gap-4">
+        {/* Info Section */}
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div
+            className={`p-3 rounded-2xl transition-colors duration-300 ${isOpen ? "bg-blue-600 text-white scale-110" : "bg-white/5 text-gray-500"}`}
+          >
+            {icon === "key" ? <Key size={20} /> : <FileText size={20} />}
+          </div>
+          <div className="min-w-0">
+            <h4 className="font-bold text-sm truncate text-white/90">{name}</h4>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5">
+              {date}
+            </p>
+          </div>
+        </div>
 
-  export default Dashboard;
+        {/* Menu Trigger */}
+        <div className="relative">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveMenu(isOpen ? null : file._id);
+            }}
+            className={`p-2.5 rounded-xl z-[110] relative transition-all ${
+              isOpen
+                ? "bg-white text-black scale-110 shadow-lg"
+                : "text-gray-500 hover:text-white"
+            }`}
+          >
+            {isOpen ? <X size={18} /> : <MoreVertical size={18} />}
+          </button>
+
+          {/* 🚀 MICRO CONTEXT MENU (Mobile & Desktop Unified) */}
+          <AnimatePresence>
+            {isOpen && (
+              <>
+                {/* Transparent Scrim to close on outside tap */}
+                <div
+                  className="fixed inset-0 z-[100]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveMenu(null);
+                  }}
+                />
+
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8, x: 10, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, x: 10, y: -10 }}
+                  className="absolute right-0 mt-3 w-48 bg-[#0d0f14]/90 border border-white/10 rounded-[20px] shadow-2xl z-[105] overflow-hidden backdrop-blur-2xl origin-top-right"
+                >
+                  <div className="p-1.5 flex flex-col gap-1">
+                    <CompactMenuItem
+                      icon={
+                        <Star
+                          size={16}
+                          className={
+                            file.isFavorite
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-gray-400"
+                          }
+                        />
+                      }
+                      label={file.isFavorite ? "Unfavorite" : "Favorite"}
+                      onClick={() => runAction(() => toggleFavorite(file._id))}
+                    />
+                    <CompactMenuItem
+                      icon={<Download size={16} className="text-blue-400" />}
+                      label="Download"
+                      onClick={() => runAction(() => handleDownload(file))}
+                    />
+                    <CompactMenuItem
+                      icon={<Share2 size={16} className="text-green-400" />}
+                      label="Share"
+                      onClick={() => runAction(() => handleShare(file))}
+                    />
+                    <div className="h-px bg-white/5 mx-2 my-1" />
+                    {file.isDeleted ? (
+                      <>
+                        <CompactMenuItem
+                          icon={<Check size={16} className="text-green-400" />}
+                          label="Restore"
+                          onClick={() => runAction(() => handleRestore(file))}
+                        />
+
+                        <CompactMenuItem
+                          icon={<Trash2 size={16} className="text-red-500" />}
+                          label="Delete Forever"
+                          variant="danger"
+                          onClick={() =>
+                            runAction(() => handlePermanentDelete(file))
+                          }
+                        />
+                      </>
+                    ) : (
+                      <CompactMenuItem
+                        icon={<Trash2 size={16} className="text-red-500" />}
+                        label="Delete"
+                        variant="danger"
+                        onClick={() => runAction(() => handleDelete(file))}
+                      />
+                    )}
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+/* Micro Menu Item Component */
+const CompactMenuItem = ({ icon, label, onClick, variant = "default" }) => (
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick();
+    }}
+    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all active:scale-95 ${
+      variant === "danger"
+        ? "hover:bg-red-500/10 text-red-400"
+        : "hover:bg-white/5 text-white/80"
+    }`}
+  >
+    <span className="p-1.5 bg-white/5 rounded-lg">{icon}</span>
+    <span className="text-xs font-bold tracking-tight">{label}</span>
+  </button>
+);
+
+export default Dashboard;

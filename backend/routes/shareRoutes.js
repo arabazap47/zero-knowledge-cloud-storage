@@ -4,6 +4,7 @@ import Share from "../models/Share.js";
 import verifyToken from "../middleware/auth.js";
 import File from "../models/File.js";
 import supabase from "../config/supabase.js"; 
+import { createNotification } from "../utils/sendNotification.js";
 
 const router = express.Router();
 
@@ -63,13 +64,26 @@ if (!dbPassword || dbPassword.trim() === "") {
 
     if (
       share.maxDownloads &&
-      share.downloadCount >= share.maxDownloads
+      share.downloadCount === share.maxDownloads
     ) {
       return res.status(400).json({ msg: "Download limit reached" });
     }
 
     share.downloadCount += 1;
     await share.save();
+
+    if (
+  share.maxDownloads &&
+  share.downloadCount === share.maxDownloads
+) {
+  const file = await File.findById(share.fileId);
+
+  await createNotification(
+    share.ownerId,
+    `⚠️ Download limit reached for file: ${file?.originalName || "file"}`,
+    "file"
+  );
+}
 
     const file = await File.findById(share.fileId);
 

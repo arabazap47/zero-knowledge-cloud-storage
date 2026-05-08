@@ -10,6 +10,7 @@ import fileRoutes from "./routes/fileRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import shareRoutes from "./routes/shareRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 connectDB();
 
@@ -31,5 +32,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/payment", paymentRoutes);
 
 app.use("/api/share", shareRoutes);
+
+app.use("/api/notifications", notificationRoutes);
 
 app.listen(5000, () => console.log("Server running on port 5000"));

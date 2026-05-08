@@ -141,7 +141,8 @@ if (file.size > MAX_FILE_SIZE) {
 
     const data = await res.json();
 
-    onUploadSuccess(); // refresh dashboard
+    onUploadSuccess(file.name); // refresh dashboard
+    onClose();
 
   } catch (err) {
     console.error("Upload failed:", err);
@@ -152,13 +153,6 @@ if (file.size > MAX_FILE_SIZE) {
     setIsDragging(false);
     const droppedFiles = Array.from(e.dataTransfer.files);
     if (droppedFiles.length > 0) {
-      // setFiles(prev => [
-      //   ...droppedFiles.map(file => ({
-      //   file,
-      //   id: crypto.randomUUID() // ✅ ADD THIS
-      //   })),      
-      //   ...prev
-      // ]);
       setActiveIntelligence(droppedFiles[0]);
       droppedFiles.forEach(file => handleUpload(file));
     }
@@ -222,7 +216,7 @@ const removeFile = (id) => {
   </div>
 )}
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-start md:items-center justify-center p-3 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-[200] flex items-start md:items-center justify-center p-3 sm:p-6 overflow-y-auto">
           {/* Backdrop */}
           <motion.div 
             initial={{ opacity: 0 }}

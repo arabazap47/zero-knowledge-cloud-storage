@@ -89,11 +89,11 @@ await createNotification(user._id, message, "plan");
       </div>
       `
     );
-    await createNotification(
-  user._id,
-  `🚀 Your plan upgraded to ${plan}`,
-  "plan"
-);
+//     await createNotification(
+//   user._id,
+//   `🚀 Your plan upgraded to ${plan}`,
+//   "plan"
+// );
     
 
     res.json({

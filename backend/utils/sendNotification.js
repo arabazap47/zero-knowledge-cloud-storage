@@ -12,7 +12,7 @@
 //   }
 // };
 import Notification from "../models/Notification.js";
-
+console.log("Notification model:", Notification); // 🔥 DEBUG
 export const createNotification = async (userId, message, type) => {
   try {
     const newNotif = new Notification({ userId, message, type });
@@ -20,4 +20,5 @@ export const createNotification = async (userId, message, type) => {
   } catch (err) {
     console.error("Notification creation failed", err);
   }
-};
+}; 
+

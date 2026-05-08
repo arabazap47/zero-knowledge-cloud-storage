@@ -10,7 +10,7 @@ import { deriveKey, encryptFileChunks, encryptFileKey, generateFileKey,importFil
 
 
 
-const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess, onStorageLimit  }) => {
+const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess, onStorageLimit, folderId  }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState([]);
   const [activeIntelligence, setActiveIntelligence] = useState(null);
@@ -120,6 +120,10 @@ if (file.size > MAX_FILE_SIZE) {
     formData.append("fileHash", fileHash);
     formData.append("encryptedFileKey", encryptedFileKey);
     formData.append("file", encryptedBlob, file.name + ".enc");
+
+    if (folderId) {
+    formData.append("folderId", folderId);
+  }
 
     const res = await fetch("http://localhost:5000/api/files/upload", {
       method: "POST",

@@ -1,6 +1,21 @@
 import supabase from "../config/supabase.js";
 import File from "../models/File.js";
 import User from "../models/User.js";
+import Folder from "../models/Folder.js";
+
+export const createFolder = async (req, res) => {
+  try {
+    const { name, parentId } = req.body;
+    const newFolder = await Folder.create({
+      name,
+      userId: req.user.id,
+      parentId: parentId || null
+    });
+    res.json(newFolder);
+  } catch (err) {
+    res.status(500).json({ msg: "Folder creation failed" });
+  }
+};
 
 const STORAGE_LIMITS = {
   Starter: 50 * 1024 * 1024, // 50MB
@@ -8,11 +23,53 @@ const STORAGE_LIMITS = {
   Business: 150 * 1024 * 1024, // 300MB
 };
 
+// backend/controllers/fileController.js
+
+export const deleteFolder = async (req, res) => {
+  try {
+    const { folderId } = req.body;
+    const userId = req.user.id; // From verifyToken middleware
+
+    if (!folderId) {
+      return res.status(400).json({ msg: "Folder ID is required" });
+    }
+
+    // 1. Soft delete the folder itself
+    const folder = await Folder.findOneAndUpdate(
+      { _id: folderId, userId },
+      { isDeleted: true },
+      { new: true }
+    );
+
+    if (!folder) {
+      return res.status(404).json({ msg: "Folder not found" });
+    }
+
+    // 2. Soft delete all files belonging to this folder
+    await File.updateMany(
+      { folderId, userId },
+      { isDeleted: true }
+    );
+
+    // 3. Soft delete all sub-folders belonging to this folder
+    await Folder.updateMany(
+      { parentId: folderId, userId },
+      { isDeleted: true }
+    );
+
+    res.json({ msg: "Folder and contents moved to trash" });
+  } catch (err) {
+    console.error("Delete Folder Backend Error:", err);
+    res.status(500).json({ msg: "Internal server error" });
+  }
+};
+
 export const uploadFile = async (req, res) => {
   try {
     const file = req.file;
     const fileHash = req.body.fileHash;
     const encryptedFileKey = req.body.encryptedFileKey;
+    const folderId = req.body.folderId; // 🟢 1. Capture the folderId from the frontend
     const userId = req.user.id;
 
     if (!file) return res.status(400).json({ msg: "No file uploaded" });
@@ -42,8 +99,9 @@ export const uploadFile = async (req, res) => {
       const newFile = await File.create({
         userId,
         filename: file.originalname,
-        filePath: existing.filePath, // reuse same file
+        filePath: existing.filePath, 
         fileUrl: existing.fileUrl,
+        folderId: folderId || null, // 🟢 2. Assign folderId even for reused files
         originalName: req.file.originalname,
         mimeType: req.file.mimetype,
         fileHash,
@@ -69,12 +127,6 @@ export const uploadFile = async (req, res) => {
         contentType: file.mimetype,
       });
 
-    console.log("UPLOAD RESPONSE:", data);
-    console.log("UPLOAD ERROR:", error);
-    console.log("BODY:", req.body);
-    console.log("fileHash:", req.body.fileHash);
-    console.log("encryptedFileKey:", req.body.encryptedFileKey);
-
     if (error) {
       return res.status(500).json({ msg: error.message });
     }
@@ -83,9 +135,7 @@ export const uploadFile = async (req, res) => {
       return res.status(500).json({ msg: "Upload failed" });
     }
 
-    console.log("UPLOADED PATH:", filePath);
-
-    // 5️⃣ Get public URL (or signed later)
+    // 5️⃣ Get public URL
     const { data: publicUrlData } = supabase.storage
       .from("user-files")
       .getPublicUrl(filePath);
@@ -101,16 +151,15 @@ export const uploadFile = async (req, res) => {
       fileHash,
       encryptedFileKey,
       size: file.size,
-
-      // 🔥 ADD THESE (CRITICAL)
+      folderId: folderId || null, // 🟢 3. SAVE THE FOLDER ID HERE
       originalName: file.originalname,
       mimeType: file.mimetype,
       logs: [
-    {
-      action: "uploaded",
-      user: userId,
-    }
-  ]
+        {
+          action: "uploaded",
+          user: userId,
+        }
+      ]
     });
 
     res.json({
@@ -123,35 +172,59 @@ export const uploadFile = async (req, res) => {
   }
 };
 
+
 //to get files
+// export const getFiles = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+
+//     const user = await User.findById(userId);
+
+//     const files = await File.find({ userId, isDeleted: false }).sort({
+//       createdAt: -1,
+//     });
+//     const uniqueFiles = {};
+//     files.forEach((f) => {
+//       uniqueFiles[f.fileHash] = f;
+//     });
+//     const totalUsed = Object.values(uniqueFiles).reduce(
+//       (acc, f) => acc + f.size,
+//       0,
+//     );
+
+//     res.json({
+//       files,
+//       used: totalUsed,
+//       limit: user.storageLimit || STORAGE_LIMITS["Starter"],
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ msg: "Failed to fetch files" });
+//   }
+// };
 export const getFiles = async (req, res) => {
   try {
-    const userId = req.user.id;
-
-    const user = await User.findById(userId);
-
-    const files = await File.find({ userId, isDeleted: false }).sort({
-      createdAt: -1,
+    const { folderId } = req.query; // Get the ID from the frontend request
+    
+    // Filter folders and files by parentId/folderId
+    const folders = await Folder.find({ 
+      userId: req.user.id, 
+      parentId: folderId || null, // null means root
+      isDeleted: false 
     });
-    const uniqueFiles = {};
-    files.forEach((f) => {
-      uniqueFiles[f.fileHash] = f;
+    
+    const files = await File.find({ 
+      userId: req.user.id, 
+      folderId: folderId || null, 
+      isDeleted: false 
     });
-    const totalUsed = Object.values(uniqueFiles).reduce(
-      (acc, f) => acc + f.size,
-      0,
-    );
 
-    res.json({
-      files,
-      used: totalUsed,
-      limit: user.storageLimit || STORAGE_LIMITS["Starter"],
-    });
+    res.json({ files, folders });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Failed to fetch files" });
+    res.status(500).json({ msg: "Fetch failed" });
   }
 };
+
 //trash files api
 export const getTrashFiles = async (req, res) => {
   try {

@@ -1,5 +1,5 @@
 import express from "express";
-import { uploadFile, getFiles, deleteFile, downloadFile, toggleFavorite, restoreFile, permanentlyDeleteFile, getTrashFiles } from "../controllers/fileController.js";
+import { uploadFile, getFiles, deleteFile, downloadFile, toggleFavorite, restoreFile, permanentlyDeleteFile, getTrashFiles, getFileTimeline } from "../controllers/fileController.js";
 import verifyToken from "../middleware/auth.js";
 import multer from "multer";
 
@@ -18,6 +18,8 @@ router.post("/restore", verifyToken, restoreFile);
 router.post("/delete-permanent", verifyToken, permanentlyDeleteFile);
 router.get("/trash", verifyToken, getTrashFiles);
 
-router.get("/", verifyToken, getFiles);
+router.get("/", verifyToken, getFiles); 
+
+router.get("/timeline/:filename", getFileTimeline);
 
 export default router;

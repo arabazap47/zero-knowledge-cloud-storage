@@ -1,20 +1,18 @@
-
-
 import supabase from "../config/supabase.js";
 import File from "../models/File.js";
 import User from "../models/User.js";
 
 const STORAGE_LIMITS = {
-  Starter: 50 * 1024 * 1024,       // 50MB
-  Pro: 100 * 1024 * 1024,      // 150MB
-  Business: 150 * 1024 * 1024 // 300MB
+  Starter: 50 * 1024 * 1024, // 50MB
+  Pro: 100 * 1024 * 1024, // 150MB
+  Business: 150 * 1024 * 1024, // 300MB
 };
 
 export const uploadFile = async (req, res) => {
   try {
     const file = req.file;
     const fileHash = req.body.fileHash;
-const encryptedFileKey = req.body.encryptedFileKey;
+    const encryptedFileKey = req.body.encryptedFileKey;
     const userId = req.user.id;
 
     if (!file) return res.status(400).json({ msg: "No file uploaded" });
@@ -31,89 +29,94 @@ const encryptedFileKey = req.body.encryptedFileKey;
     // 3️⃣ Check limit
     if (totalUsed + file.size > limit) {
       return res.status(400).json({
-  msg: `Storage Full ⚠️`,
-  details: `You have exceeded your ${user.plan} plan limit.`,
-  upgrade: true
-});
+        msg: `Storage Full ⚠️`,
+        details: `You have exceeded your ${user.plan} plan limit.`,
+        upgrade: true,
+      });
     }
 
     // 🔥 CHECK IF FILE ALREADY EXISTS
-const existing = await File.findOne({ fileHash });
+    const existing = await File.findOne({ fileHash });
 
-if (existing) {
-  const newFile = await File.create({
-    userId,
-    filename: file.originalname,
-    filePath: existing.filePath, // reuse same file
-    fileUrl: existing.fileUrl,
-    originalName: req.file.originalname,
-  mimeType: req.file.mimetype,
-    fileHash,
-    encryptedFileKey,
-    size: file.size,
-  });
+    if (existing) {
+      const newFile = await File.create({
+        userId,
+        filename: file.originalname,
+        filePath: existing.filePath, // reuse same file
+        fileUrl: existing.fileUrl,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        fileHash,
+        encryptedFileKey,
+        size: file.size,
+      });
 
-  return res.json({
-    msg: "Duplicate file reused",
-    file: newFile,
-  });
-}
+      return res.json({
+        msg: "Duplicate file reused",
+        file: newFile,
+      });
+    }
 
     // 4️⃣ Upload to Supabase
     const safeName = file.originalname
-  .replace(/\s+/g, "_")
-  .replace(/[^a-zA-Z0-9._-]/g, "");
-const filePath = `${userId}/${Date.now()}-${safeName}`;
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9._-]/g, "");
+    const filePath = `${userId}/${Date.now()}-${safeName}`;
 
     const { data, error } = await supabase.storage
-  .from("user-files")
-  .upload(filePath, file.buffer, {
-    contentType: file.mimetype,
-  });
+      .from("user-files")
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+      });
 
-console.log("UPLOAD RESPONSE:", data);
-console.log("UPLOAD ERROR:", error);
-console.log("BODY:", req.body);
-console.log("fileHash:", req.body.fileHash);
-console.log("encryptedFileKey:", req.body.encryptedFileKey);
+    console.log("UPLOAD RESPONSE:", data);
+    console.log("UPLOAD ERROR:", error);
+    console.log("BODY:", req.body);
+    console.log("fileHash:", req.body.fileHash);
+    console.log("encryptedFileKey:", req.body.encryptedFileKey);
 
-if (error) {
-  return res.status(500).json({ msg: error.message });
-}
+    if (error) {
+      return res.status(500).json({ msg: error.message });
+    }
 
-if (!data) {
-  return res.status(500).json({ msg: "Upload failed" });
-}
+    if (!data) {
+      return res.status(500).json({ msg: "Upload failed" });
+    }
 
-console.log("UPLOADED PATH:", filePath);
+    console.log("UPLOADED PATH:", filePath);
 
     // 5️⃣ Get public URL (or signed later)
     const { data: publicUrlData } = supabase.storage
-  .from("user-files")
-  .getPublicUrl(filePath);
+      .from("user-files")
+      .getPublicUrl(filePath);
 
-const fileUrl = publicUrlData.publicUrl;
+    const fileUrl = publicUrlData.publicUrl;
 
     // 6️⃣ Save metadata
     const newFile = await File.create({
-  userId,
-  filename: file.originalname,
-  fileUrl,
-  filePath,
-  fileHash,
-  encryptedFileKey,
-  size: file.size,
+      userId,
+      filename: file.originalname,
+      fileUrl,
+      filePath,
+      fileHash,
+      encryptedFileKey,
+      size: file.size,
 
-  // 🔥 ADD THESE (CRITICAL)
-  originalName: file.originalname,
-  mimeType: file.mimetype,
-});
+      // 🔥 ADD THESE (CRITICAL)
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      logs: [
+    {
+      action: "uploaded",
+      user: userId,
+    }
+  ]
+    });
 
     res.json({
       msg: "File uploaded successfully",
       file: newFile,
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Upload failed" });
@@ -127,20 +130,23 @@ export const getFiles = async (req, res) => {
 
     const user = await User.findById(userId);
 
-    const files = await File.find({ userId,  isDeleted: false }).sort({ createdAt: -1 });
+    const files = await File.find({ userId, isDeleted: false }).sort({
+      createdAt: -1,
+    });
     const uniqueFiles = {};
-files.forEach(f => {
-  uniqueFiles[f.fileHash] = f;
-});
-const totalUsed = Object.values(uniqueFiles)
-  .reduce((acc, f) => acc + f.size, 0);
+    files.forEach((f) => {
+      uniqueFiles[f.fileHash] = f;
+    });
+    const totalUsed = Object.values(uniqueFiles).reduce(
+      (acc, f) => acc + f.size,
+      0,
+    );
 
     res.json({
-    files,
-    used: totalUsed,
-    limit: user.storageLimit || STORAGE_LIMITS["Starter"]
+      files,
+      used: totalUsed,
+      limit: user.storageLimit || STORAGE_LIMITS["Starter"],
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Failed to fetch files" });
@@ -153,11 +159,10 @@ export const getTrashFiles = async (req, res) => {
 
     const files = await File.find({
       userId,
-      isDeleted: true
+      isDeleted: true,
     });
 
     res.json({ files });
-
   } catch (err) {
     console.error("TRASH ERROR:", err);
     res.status(500).json({ msg: "Failed to fetch trash files" });
@@ -165,6 +170,21 @@ export const getTrashFiles = async (req, res) => {
 };
 
 //delete trash files
+// export const deleteFile = async (req, res) => {
+//   try {
+//     const { fileId } = req.body;
+
+//     const file = await File.findById(fileId);
+//     if (!file) return res.status(404).json({ msg: "File not found" });
+
+//     file.isDeleted = true;
+//     await file.save();
+
+//     res.json({ msg: "Moved to trash" });
+//   } catch (err) {
+//     res.status(500).json({ msg: "Delete failed" });
+//   }
+// };
 export const deleteFile = async (req, res) => {
   try {
     const { fileId } = req.body;
@@ -172,7 +192,17 @@ export const deleteFile = async (req, res) => {
     const file = await File.findById(fileId);
     if (!file) return res.status(404).json({ msg: "File not found" });
 
+    // 🔥 Mark as deleted
     file.isDeleted = true;
+
+    // 🔥 ADD LOG
+    file.logs = file.logs || [];
+    file.logs.push({
+      action: "deleted",
+      user: req.user.id,
+      timestamp: new Date()
+    });
+
     await file.save();
 
     res.json({ msg: "Moved to trash" });
@@ -182,8 +212,25 @@ export const deleteFile = async (req, res) => {
   }
 };
 
-
 //peremnent delete
+// export const permanentlyDeleteFile = async (req, res) => {
+//   try {
+//     const { fileId } = req.body;
+
+//     const file = await File.findById(fileId);
+//     if (!file) return res.status(404).json({ msg: "File not found" });
+
+//     // delete from storage
+//     await supabase.storage.from("user-files").remove([file.filePath]);
+
+//     // delete from DB
+//     await File.findByIdAndDelete(fileId);
+
+//     res.json({ msg: "File permanently deleted" });
+//   } catch (err) {
+//     res.status(500).json({ msg: "Permanent delete failed" });
+//   }
+// };
 export const permanentlyDeleteFile = async (req, res) => {
   try {
     const { fileId } = req.body;
@@ -191,12 +238,20 @@ export const permanentlyDeleteFile = async (req, res) => {
     const file = await File.findById(fileId);
     if (!file) return res.status(404).json({ msg: "File not found" });
 
-    // delete from storage
-    await supabase.storage
-      .from("user-files")
-      .remove([file.filePath]);
+    // 🔥 ADD FINAL LOG (optional but powerful)
+    file.logs = file.logs || [];
+    file.logs.push({
+      action: "permanently_deleted",
+      user: req.user.id,
+      timestamp: new Date()
+    });
 
-    // delete from DB
+    await file.save();
+
+    // 🔥 delete from storage
+    await supabase.storage.from("user-files").remove([file.filePath]);
+
+    // 🔥 delete from DB
     await File.findByIdAndDelete(fileId);
 
     res.json({ msg: "File permanently deleted" });
@@ -219,12 +274,38 @@ export const restoreFile = async (req, res) => {
     await file.save();
 
     res.json({ msg: "File restored successfully" });
-
   } catch (err) {
     res.status(500).json({ msg: "Restore failed" });
   }
 };
 
+// export const downloadFile = async (req, res) => {
+//   try {
+//     const { path } = req.body;
+
+//     if (!path) {
+//       return res.status(400).json({ msg: "Path missing" });
+//     }
+
+//     console.log("DOWNLOAD PATH:", path);
+
+//     const { data, error } = await supabase.storage
+//       .from("user-files")
+//       .createSignedUrl(path, 60);
+
+//     if (error) {
+//       console.log("SUPABASE ERROR:", error.message);
+//       return res.status(404).json({ msg: "File not found in storage" });
+//     }
+
+//     res.json({ url: data.signedUrl });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ msg: "Download failed" });
+//   }
+// };
+
+//favorite logic
 
 export const downloadFile = async (req, res) => {
   try {
@@ -236,6 +317,10 @@ export const downloadFile = async (req, res) => {
 
     console.log("DOWNLOAD PATH:", path);
 
+    // 🔥 Find file in DB
+    const fileDoc = await File.findOne({ filePath: path });
+
+    // 🔐 Generate signed URL
     const { data, error } = await supabase.storage
       .from("user-files")
       .createSignedUrl(path, 60);
@@ -245,6 +330,21 @@ export const downloadFile = async (req, res) => {
       return res.status(404).json({ msg: "File not found in storage" });
     }
 
+    // 🔥 ADD LOG + download count
+    if (fileDoc) {
+      fileDoc.logs = fileDoc.logs || [];
+
+      fileDoc.logs.push({
+        action: "downloaded",
+        user: req.user.id,
+        timestamp: new Date()
+      });
+
+      fileDoc.downloadCount = (fileDoc.downloadCount || 0) + 1;
+
+      await fileDoc.save();
+    }
+
     res.json({ url: data.signedUrl });
 
   } catch (err) {
@@ -252,11 +352,6 @@ export const downloadFile = async (req, res) => {
     res.status(500).json({ msg: "Download failed" });
   }
 };
-
-
-
-//favorite logic
-
 export const toggleFavorite = async (req, res) => {
   try {
     const { fileId } = req.body;
@@ -268,9 +363,36 @@ export const toggleFavorite = async (req, res) => {
     await file.save();
 
     res.json({ msg: "Updated", file });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Favorite failed" });
+  }
+};
+
+// filecontroller.js -> getFileTimeline
+export const getFileTimeline = async (req, res) => {
+  try {
+    const filename = decodeURIComponent(req.params.filename);
+
+    // Search for the filename AS IS, or with .enc appended
+    const file = await File.findOne({
+      userId: req.user.id, // Security: Ensure user owns the file
+      $or: [
+        { filename: { $regex: new RegExp(`^${filename}$`, "i") } },
+        { filename: { $regex: new RegExp(`^${filename}\\.enc$`, "i") } }
+      ]
+    });
+
+    if (!file) {
+      return res.status(404).json({ msg: `File '${filename}' not found` });
+    }
+
+    res.json({
+      logs: file.logs || []
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Failed to fetch timeline" });
   }
 };

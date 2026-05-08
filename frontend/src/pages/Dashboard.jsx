@@ -69,6 +69,9 @@
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [terminalRef, setTerminalRef] = useState(null);
+  const [sortBy, setSortBy] = useState("date-desc"); // options: date-desc, date-asc, name-asc, name-desc, size-desc
+const [dateFilter, setDateFilter] = useState("all"); // options: all, today, yesterday, week
+
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
 
@@ -335,20 +338,69 @@
     });
 
     // 3. FILTER LOGIC
-    const filteredFiles = processedFiles.filter((file) => {
-      // ❌ Hide deleted files from My Files
-      if (activeTab === "My Files" && file.isDeleted) return false;
+    // const filteredFiles = processedFiles.filter((file) => {
+    //   // ❌ Hide deleted files from My Files
+    //   if (activeTab === "My Files" && file.isDeleted) return false;
 
-      // ⭐ Favorites tab
-      if (activeTab === "Favorites" && (!file.isFavorite || file.isDeleted))
-        return false;
+    //   // ⭐ Favorites tab
+    //   if (activeTab === "Favorites" && (!file.isFavorite || file.isDeleted))
+    //     return false;
 
-      // 🗑️ Trash tab
-      if (activeTab === "Trash" && !file.isDeleted) return false;
+    //   // 🗑️ Trash tab
+    //   if (activeTab === "Trash" && !file.isDeleted) return false;
 
-      // 🔍 Search filter
-      return file.filename.toLowerCase().includes(search.toLowerCase());
-    });
+    //   // 🔍 Search filter
+    //   return file.filename.toLowerCase().includes(search.toLowerCase());
+    // });
+
+    // 1. DATE HELPERS
+    const isToday = (date) => {
+      const today = new Date();
+      return date.getDate() === today.getDate() &&
+        date.getMonth() === today.getMonth() &&
+        date.getFullYear() === today.getFullYear();
+    };
+
+    const isYesterday = (date) => {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      return date.getDate() === yesterday.getDate() &&
+        date.getMonth() === yesterday.getMonth() &&
+        date.getFullYear() === yesterday.getFullYear();
+    };
+
+    const isWithinLastWeek = (date) => {
+      const lastWeek = new Date();
+      lastWeek.setDate(lastWeek.getDate() - 7);
+      return date >= lastWeek;
+    };
+
+    // 2. FILTER & SORT LOGIC
+    const filteredFiles = processedFiles
+      .filter((file) => {
+        if (activeTab === "My Files" && file.isDeleted) return false;
+        if (activeTab === "Favorites" && (!file.isFavorite || file.isDeleted)) return false;
+        if (activeTab === "Trash" && !file.isDeleted) return false;
+        
+        // Search filter
+        if (!file.filename.toLowerCase().includes(search.toLowerCase())) return false;
+
+        // Date Period Filter
+        const fileDate = new Date(file.uploadedAt);
+        if (dateFilter === "today" && !isToday(fileDate)) return false;
+        if (dateFilter === "yesterday" && !isYesterday(fileDate)) return false;
+        if (dateFilter === "week" && !isWithinLastWeek(fileDate)) return false;
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === "date-desc") return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+        if (sortBy === "date-asc") return new Date(a.uploadedAt) - new Date(b.uploadedAt);
+        if (sortBy === "name-asc") return a.filename.localeCompare(b.filename);
+        if (sortBy === "name-desc") return b.filename.localeCompare(a.filename);
+        if (sortBy === "size-desc") return b.size - a.size;
+        return 0;
+      });
 
     // 🔄 Restore
     const handleRestore = async (file) => {
@@ -948,6 +1000,39 @@ const handleTerminalUploadSuccess = (fileName) => {
             </div>
 
             <div className="flex flex-col gap-6 pb-24">
+              {/* 🛠️ SORT & FILTER BAR */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-4 px-2">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                {["all", "today", "yesterday", "week"].map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => setDateFilter(period)}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                      dateFilter === period
+                        ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20"
+                        : "bg-white/5 border-white/10 text-gray-500 hover:text-gray-300"
+                    }`}
+                  >
+                    {period}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-gray-600 uppercase tracking-tighter">Sort By:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-[#0a0c10] border border-white/10 rounded-lg text-[10px] font-bold text-gray-400 px-2 py-1 outline-none focus:border-blue-500/50"
+                >
+                  <option value="date-desc">Newest First</option>
+                  <option value="date-asc">Oldest First</option>
+                  <option value="name-asc">A-Z</option>
+                  <option value="name-desc">Z-A</option>
+                  <option value="size-desc">Largest Size</option>
+                </select>
+              </div>
+            </div>
               {/* 🏷️ DYNAMIC HEADING: Shows up when you're in the Favorites tab */}
               <AnimatePresence mode="wait">
                 {activeTab === "Favorites" && filteredFiles.length > 0 && (

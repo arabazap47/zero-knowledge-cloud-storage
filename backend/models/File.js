@@ -33,6 +33,13 @@ isDeleted: {
 fileHash: { type: String, required: true },
 encryptedFileKey: { type: String, required: true },
 mimeType: { type: String },
+logs: [
+  {
+    action: String, // upload, share, download, delete
+    timestamp: { type: Date, default: Date.now },
+    user: String,
+  }
+]
 });
 
 export default mongoose.model("File", fileSchema);

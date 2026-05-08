@@ -83,6 +83,7 @@ if (!dbPassword || dbPassword.trim() === "") {
   ownerId: share.ownerId, // 🔥 IMPORTANT
   fileName: file.originalName || file.filename || "file",
 mimeType: file.mimeType || "application/octet-stream",
+fileSize: file.size || 0,
   downloadsLeft: share.maxDownloads - share.downloadCount,
   maxDownloads: share.maxDownloads,
   createdAt: share.createdAt,
@@ -138,6 +139,8 @@ router.get("/info/:token", async (req, res) => {
 
     res.json({
       fileName: file?.originalName || "file",
+      mimeType: file?.mimeType || "application/octet-stream", // ✅ ADD
+  fileSize: file?.size || 0,
       isProtected: !!(share.password && share.password.trim()),
       maxDownloads: share.maxDownloads,
       downloadCount: share.downloadCount,

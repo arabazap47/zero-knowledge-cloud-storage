@@ -8,6 +8,8 @@ import Pricing from "../components/Pricing";
 import Footer from "../components/Footer";
 import Login from "./Login";
 import Signup from "./Signup";
+import AIChatbot from "../components/Chatbot";
+import FAQ from "../components/FAQ";
 
 export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -46,6 +48,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#050505] font-sans selection:bg-blue-500/30">
+      <AIChatbot /> {/* 🟢 Fixed at bottom right */}
       <Login 
         isOpen={isLoginOpen} 
         onClose={closeAll} 
@@ -71,6 +74,9 @@ export default function App() {
       </div>
       <div id="pricing">  
         <Pricing />
+      </div>
+      <div id="faq">
+        <FAQ />
       </div>
       <Footer />
     </div>

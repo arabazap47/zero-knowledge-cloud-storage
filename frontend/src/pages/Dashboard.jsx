@@ -1463,6 +1463,9 @@ const Dashboard = () => {
           <TerminalMode
             refCallback={setTerminalRef}
             userFiles={files}
+            folders={folders} // 🟢 Pass folders list
+  currentFolder={currentFolder} // 🟢 Pass current location
+  setCurrentFolder={setCurrentFolder} // 🟢 Pass the navigation function
             onUpload={() => setIsUploadModalOpen(true)} // reuse your upload modal
             onDelete={async (filename) => {
               const file = files.find((f) => f.filename === filename);

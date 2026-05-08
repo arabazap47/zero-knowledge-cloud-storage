@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 
-const TerminalMode = ({ userFiles, onUpload, onDelete, refCallback }) => {
+const TerminalMode = ({ userFiles, folders, currentFolder, setCurrentFolder, onUpload, onDelete, refCallback }) => {
   const [input, setInput] = useState("");
   const [history, setHistory] = useState([
     { text: "PrivyDrive Zero-Knowledge Vault [Version 1.0.0]", type: "system" },
@@ -74,17 +74,49 @@ Available Commands:
         break;
 
       case "ls":
-        if (userFiles && userFiles.length > 0) {
-          const fileList = userFiles
-            .map(
-              (f) =>
-                `📄 ${f.filename?.replace(".enc", "")} (${(f.size / 1024).toFixed(2)} KB)`,
-            )
-            .join("\n");
-          addToHistory(fileList, "success");
-        } else {
-          addToHistory("Vault is empty. No encrypted blobs found.", "warning");
+        // List folders first, then files
+        const folderList = folders.map(f => `📁 ${f.name}/`).join("\n");
+        const fileList = userFiles.map(f => `📄 ${f.filename?.replace(".enc", "")} (${(f.size / 1024).toFixed(2)} KB)`).join("\n");
+        
+        const output = [folderList, fileList].filter(Boolean).join("\n");
+        addToHistory(output || "Directory is empty.", output ? "success" : "warning");
+        break;
+
+      case "cd":
+        const target = args[0];
+        if (!target) {
+          addToHistory("Usage: cd <foldername> or cd ..", "error");
+          break;
         }
+
+        if (target === "..") {
+          // Go back to root
+          if (!currentFolder) {
+            addToHistory("Already in root directory.", "warning");
+          } else {
+            setCurrentFolder(null);
+            addToHistory("Navigated to root.", "system");
+          }
+        } else {
+          // Find the folder by name
+          const targetFolder = folders.find(f => 
+            f.name.toLowerCase() === target.toLowerCase() || 
+            f.name.toLowerCase() === target.replace("/", "").toLowerCase()
+          );
+
+          if (targetFolder) {
+            setCurrentFolder(targetFolder._id);
+            addToHistory(`Entering directory: ${targetFolder.name}...`, "success");
+          } else {
+            addToHistory(`Directory not found: ${target}`, "error");
+          }
+        }
+        break;
+
+      case "whoami":
+        // Improved whoami to show current path
+        const path = currentFolder ? `vault:/${folders.find(f => f._id === currentFolder)?.name || '...'}` : "vault:/root";
+        addToHistory(`Principal: authenticated_user_01\nLocation: ${path}`, "system");
         break;
 
       case "upload":
@@ -286,35 +318,23 @@ Integrity:   Checksum Verified
     }
   };
   const handleAutocomplete = () => {
-  const parts = input.trim().split(" ");
-  const lastWord = parts[parts.length - 1];
+    const parts = input.trim().split(" ");
+    const lastWord = parts[parts.length - 1];
+    if (!lastWord) return;
 
-  if (!lastWord) return;
+    // 🔍 Find matching files AND folders
+    const fileMatches = userFiles.filter(f => f.filename.toLowerCase().includes(lastWord.toLowerCase()));
+    const folderMatches = folders.filter(f => f.name.toLowerCase().includes(lastWord.toLowerCase()));
 
-  // 🔍 Find matching files
-  const matches = userFiles.filter(f =>
-    f.filename.toLowerCase().includes(lastWord.toLowerCase())
-  );
+    const totalMatches = [...folderMatches.map(m => m.name), ...fileMatches.map(m => m.filename)];
 
-  if (matches.length === 0) {
-    addToHistory("No matching files", "warning");
-    return;
-  }
-
-  if (matches.length === 1) {
-    // ✅ Auto-complete
-    const completed = matches[0].filename;
-    parts[parts.length - 1] = completed;
-    setInput(parts.join(" "));
-  } else {
-    // 🔥 Show suggestions
-    const suggestions = matches
-      .map(f => f.filename.replace(".enc", ""))
-      .join("   ");
-
-    addToHistory(suggestions, "system");
-  }
-};
+    if (totalMatches.length === 1) {
+      parts[parts.length - 1] = totalMatches[0];
+      setInput(parts.join(" "));
+    } else if (totalMatches.length > 1) {
+      addToHistory(totalMatches.join("   "), "system");
+    }
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === "Tab") {
@@ -392,9 +412,10 @@ Integrity:   Checksum Verified
 
         {/* Input Line */}
         <div className="flex items-center mt-2">
-          <span className="text-emerald-500 font-bold mr-2">
-            privydrive@vault:~$
-          </span>
+          {/* Find this line in your return JSX */}
+<span className="text-emerald-500 font-bold mr-2">
+  cypher@vault:{currentFolder ? folders.find(f => f._id === currentFolder)?.name : "~"}$
+</span>
           <input
             ref={inputRef}
             type="text"

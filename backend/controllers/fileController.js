@@ -466,6 +466,7 @@ export const getFileTimeline = async (req, res) => {
 
   } catch (err) {
     console.error(err);
+    console.error("TIMELINE ERROR:", err);  // ✅ ADD THIS
     res.status(500).json({ msg: "Failed to fetch timeline" });
   }
 };

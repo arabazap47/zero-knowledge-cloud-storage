@@ -21,7 +21,7 @@ router.get("/trash", verifyToken, getTrashFiles);
 
 router.get("/", verifyToken, getFiles); 
 
-router.get("/timeline/:filename", getFileTimeline);
+router.get("/timeline/:filename",auth , getFileTimeline);
 router.post("/create-folder", auth, createFolder);
 router.post("/delete-folder", auth, deleteFolder);
 

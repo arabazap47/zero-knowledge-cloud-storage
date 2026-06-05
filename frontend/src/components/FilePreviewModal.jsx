@@ -19,8 +19,9 @@ const FilePreviewModal = ({ file, url, isOpen, onClose }) => {
   // Logic to determine which player to show
   const isVideo = type.startsWith("video/");
   const isImage = type.startsWith("image/");
+  const isAudio = type.startsWith("audio/");
   const isPdf = type === "application/pdf";
-  const hasPreview = isVideo || isImage || isPdf;
+  const hasPreview = isVideo || isImage || isPdf || isAudio;
 
   return (
     <div className="fixed inset-0 bg-black/90 z-[200] flex flex-col items-center justify-center backdrop-blur-md">
@@ -70,6 +71,18 @@ const FilePreviewModal = ({ file, url, isOpen, onClose }) => {
             onContextMenu={(e) => e.preventDefault()}
           />
         )}
+        {/* AUDIO PLAYER */}
+{isAudio && (
+  <audio
+    controls
+    autoPlay
+    onCanPlay={() => setLoading(false)}
+    className={`w-full max-w-xl transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`}
+  >
+    <source src={url} type={type} />
+    Your browser does not support audio.
+  </audio>
+)}
 
         {/* PDF VIEWER */}
         {isPdf && (

@@ -329,16 +329,16 @@ router.post("/user/upgrade", async (req, res) => {
     let storageLimit;
     switch (plan) {
       case "Starter":
-        storageLimit = 10 * 1024 * 1024 * 1024;
+        storageLimit = 50 * 1024 * 1024;
         break;
       case "Pro":
-        storageLimit = 100 * 1024 * 1024 * 1024;
+        storageLimit = 100 * 1024 * 1024;
         break;
       case "Business":
-        storageLimit = 500 * 1024 * 1024 * 1024;
+        storageLimit = 150 * 1024 * 1024;
         break;
       default:
-        storageLimit = 2 * 1024 * 1024 * 1024;
+        storageLimit = 50 * 1024 * 1024;
     }
 
     // 🔥 EXPIRY
@@ -379,20 +379,58 @@ router.post("/user/upgrade", async (req, res) => {
 });
 
 // 🔹 BROADCAST EMAIL
+// router.post("/broadcast", async (req, res) => {
+//   try {
+//     const { subject, message } = req.body;
+//     const users = await User.find({ isDisabled: false });
+
+//     const emailPromises = users.map(user => 
+//       sendEmail(user.email, subject, `<div style="font-family: sans-serif;">${message}</div>`)
+//     );
+
+//     await Promise.all(emailPromises);
+//     res.json({ msg: `Broadcast sent to ${users.length} users` });
+//   } catch (err) {
+//     res.status(500).json({ msg: "Broadcast failed" });
+//   }
+// });
 router.post("/broadcast", async (req, res) => {
   try {
     const { subject, message } = req.body;
-    const users = await User.find({ isDisabled: false });
 
-    const emailPromises = users.map(user => 
-      sendEmail(user.email, subject, `<div style="font-family: sans-serif;">${message}</div>`)
+    const users = await User.find({
+      isDisabled: false,
+      role: { $ne: "admin" } // ✅ skip admin
+    });
+
+    const emailPromises = users.map(user =>
+      sendEmail(
+        user.email,
+        subject,
+        `<div style="font-family:sans-serif">${message}</div>`
+      )
     );
 
-    await Promise.all(emailPromises);
-    res.json({ msg: `Broadcast sent to ${users.length} users` });
+    const results = await Promise.allSettled(emailPromises);
+
+    let success = 0;
+    let failed = 0;
+
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") success++;
+      else {
+        failed++;
+        console.log("❌ Failed:", users[i].email, r.reason);
+      }
+    });
+
+    res.json({
+      msg: `✅ ${success} sent, ❌ ${failed} failed`
+    });
+
   } catch (err) {
+    console.error("Broadcast Error:", err);
     res.status(500).json({ msg: "Broadcast failed" });
   }
 });
-
 export default router;

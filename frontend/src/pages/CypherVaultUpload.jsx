@@ -33,63 +33,6 @@ const CypherVaultUpload = ({ isOpen, onClose, storage, onUploadSuccess, onStorag
     .join("");
 }
 
-// const handleUpload = async (file) => {
-//   try {
-//     const password = sessionStorage.getItem("vaultKey");
-//     const user = JSON.parse(localStorage.getItem("user"));
-
-//     const fileHash = await getFileHash(file);
-
-// // 2️⃣ generate file key
-//     const fileKey = generateFileKey();
-
-// // 3️⃣ encrypt file key with user key
-//     const encryptedFileKey = await encryptFileKey(fileKey, password);
-
-//     const key = await deriveKey(fileKey, user._id);
-
-//     const encryptedData = await encryptFileChunks(file, key);
-
-//     const encryptedBlob = new Blob([encryptedData], {
-//       type: "application/json",
-//     });
-
-//     const formData = new FormData();
-//     formData.append("fileHash", fileHash);
-//     formData.append("encryptedFileKey", encryptedFileKey);
-//     formData.append("file", encryptedBlob, file.name + ".enc");
-
-//     const res = await fetch("http://localhost:5000/api/files/upload", {
-//       method: "POST",
-//       headers: {
-//         Authorization: `Bearer ${localStorage.getItem("token")}`,
-//       },
-//       body: formData,
-//     });
-
-//     if (!res.ok) {
-//   const err = await res.json();
-
-//   if (err.msg === "Storage limit exceeded") {
-//     onStorageLimit();  // ✅ correct// 🚀 trigger upgrade UI
-//   }
-
-//   return;
-// }
-// const data = await res.json();
-
-// // ✅ refresh files in dashboard
-// onUploadSuccess();
-
-// // ✅ optional: clear UI
-// setFiles([]);
-// setActiveIntelligence(null);
-
-//   } catch (err) {
-//     console.error("Upload failed:", err);
-//   }
-// };
-
 const handleUpload = async (file) => {
   try {
     const MAX_FILE_SIZE = storage.total * 1024 * 1024; // total allowed

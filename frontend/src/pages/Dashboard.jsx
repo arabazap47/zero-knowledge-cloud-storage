@@ -742,6 +742,7 @@ const Dashboard = () => {
       else if (cleanName.endsWith(".webm")) detectedMime = "video/webm";
       else if (cleanName.endsWith(".pdf")) detectedMime = "application/pdf";
       else if (cleanName.endsWith(".png")) detectedMime = "image/png";
+      else if (cleanName.endsWith(".mp3")) detectedMime = "audio/mpeg";
       else if (cleanName.endsWith(".jpg") || cleanName.endsWith(".jpeg"))
         detectedMime = "image/jpeg";
       else detectedMime = file.mimeType || "application/octet-stream";

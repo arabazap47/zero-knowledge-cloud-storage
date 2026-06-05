@@ -1,0 +1,40 @@
+[33m9556cfb[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mauth-success[m[33m, [m[1;31morigin/auth-success[m[33m)[m Finalaized ai bot, faqs
+[33mce75e7f[m Final working terminal ls,cd
+[33mf5633eb[m Folder Creation Folder deletion, file upload in folder is working
+[33mc5e6181[m added filters
+[33m3cfa81f[m Working terminal
+[33m80ef313[m Terminal added
+[33m41d664b[m finali working with signup everything
+[33m977b8c8[m Final Working notifications and preview
+[33m75615dc[m Plan Upgrade Email is working and share link fixed working properley
+[33m6704f34[m Secure and public sharing working
+[33m00e09a6[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #13 from arabazap47/auth-success
+[33maf4f657[m Share file download file is completed
+[33mf0f792a[m Merge pull request #12 from arabazap47/auth-success
+[33m2c04040[m Completed PaymentGateWay Sharable links with password
+[33m0e27176[m Merge pull request #11 from arabazap47/auth-success
+[33mca80754[m Deduplication encryption and file key encryption is working
+[33m0a1d8fe[m Merge pull request #10 from arabazap47/auth-success
+[33m52c7a9e[m  Encryption and Decryption is working
+[33m1f01489[m Merge pull request #9 from arabazap47/auth-success
+[33m397ee0b[m Added Download, restore, move to trash
+[33m9f45c50[m Merge pull request #8 from arabazap47/auth-success
+[33m3592330[m Added delete,favorite functionality
+[33m3bd9b12[m Merge pull request #7 from arabazap47/auth-success
+[33m3154e15[m Admin pannel added
+[33m6c3b186[m Merge pull request #6 from arabazap47/auth-success
+[33mfa16f3a[m Successfully handled upload files and fetching those in file manager dashboard
+[33ma2bf86e[m Merge pull request #5 from arabazap47/auth-success
+[33mfbea781[m Added Dashboard Page and Logout functionality
+[33mbf4438f[m Merge pull request #4 from arabazap47/auth-success
+[33md4894df[m Button redirectng to page is done
+[33md7255a2[m Merge pull request #3 from arabazap47/auth-success
+[33m0b061a3[m Added auth success handling, error UI, and reset logic
+[33m7b586fa[m Merge pull request #2 from arabazap47/arbaz-auth
+[33m63db2d2[m[33m ([m[1;31morigin/arbaz-auth[m[33m, [m[1;32mmain[m[33m, [m[1;32marbaz-auth[m[33m)[m Finalized Signup working and login page
+[33m96ec4c6[m Merge pull request #1 from arabazap47/Ayisha
+[33mbc0b70e[m[33m ([m[1;31morigin/Ayisha[m[33m, [m[1;31morigin/Arabaz[m[33m, [m[1;32mArabaz[m[33m)[m login and registration page added
+[33m0e9b351[m login and registration page added
+[33mb1af56f[m Added component-based UI for CyherVault
+[33m1fb71cf[m SetUp and Home page started
+[33m763ee32[m Initial commit

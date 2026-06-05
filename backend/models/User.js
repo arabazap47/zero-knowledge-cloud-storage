@@ -10,10 +10,11 @@ const userSchema = new mongoose.Schema({
   type: String, 
   enum: ["Starter", "Pro", "Business"], 
   default: "Starter" ,
-  isDisabled: {
+  
+},
+isDisabled: {
   type: Boolean,
   default: false
-}
 },
 
 storageLimit: {
